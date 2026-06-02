@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Headless preview tool: generates a map from a seed and prints stats + an ASCII
+       minimap. Lets us "see" world generation (GDD §7) without the Unity Editor. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>FoundersLands.SimViewer</AssemblyName>
+    <RootNamespace>FoundersLands.SimViewer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../src/FoundersLands.Simulation.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Headless mirror of the Unity simulation assembly. It compiles the SAME source
+    files that live under Assets/_Project/Scripts/Simulation (single source of truth),
+    so the engine-free simulation core can be built and unit-tested in CI / on a
+    machine without Unity. Targeting netstandard2.1 + C# 9 matches what Unity 6
+    accepts, so anything that compiles here also compiles in the Editor.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>FoundersLands.Simulation</AssemblyName>
+    <RootNamespace>FoundersLands.Simulation</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Assets/_Project/Scripts/Simulation/**/*.cs" />
+  </ItemGroup>
+
+</Project>

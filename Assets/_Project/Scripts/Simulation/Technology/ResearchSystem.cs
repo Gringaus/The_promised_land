@@ -27,8 +27,18 @@ namespace FoundersLands.Simulation.Technology
                 Technology next = NextTarget(s);
                 if (next == null || s.ResearchProgress < next.Cost) break;
                 s.ResearchProgress -= next.Cost;
-                Unlock(s, next);
+                Grant(s, next);
             }
+        }
+
+        /// <summary>
+        /// Unlock a technology outright (no research cost) — for founders who arrive already knowing a
+        /// craft, or for scenario/test setup. Idempotent: granting an already-known tech does nothing.
+        /// </summary>
+        public static void Grant(Settlement s, int techId)
+        {
+            if (techId < 0 || techId >= s.Techs.Count) return;
+            Grant(s, s.Techs.Get(techId));
         }
 
         /// <summary>The next tech to research: first un-unlocked one whose prerequisites are all met.</summary>
@@ -51,9 +61,10 @@ namespace FoundersLands.Simulation.Technology
             return true;
         }
 
-        private static void Unlock(Settlement s, Technology t)
+        private static void Grant(Settlement s, Technology t)
         {
-            s.UnlockedTechs.Add(t.Id);
+            if (!s.UnlockedTechs.Add(t.Id)) return; // already known
+
             for (int i = 0; i < t.Unlocks.Length; i++) s.UnlockedBuildings.Add(t.Unlocks[i]);
             s.TechWorkBonus += t.WorkBonus;
             s.LastUnlockedTech = t.Name;

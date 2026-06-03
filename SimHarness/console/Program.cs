@@ -61,6 +61,7 @@ namespace FoundersLands.SimViewer
             if (mode == "demography") return RunDemography(seed, years, daysPerSeason);
             if (mode == "trade") return RunTrade(seed, years, daysPerSeason);
             if (mode == "tech") return RunTech(seed, years, daysPerSeason);
+            if (mode == "grand") return RunGrand(seed, years, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -334,6 +335,86 @@ namespace FoundersLands.SimViewer
             Building b = colony.PlaceBlueprint(type, x, y);
             b.WorkDone = b.WorkRequired;
             b.Complete = true;
+        }
+
+        // ---------------------------------------------------------------- grand campaign (all systems at once)
+
+        // Builds the all-systems colony shared by the console demo and the integration test.
+        private static Settlement FoundGrandColony(ulong seed)
+        {
+            WorldMap map = WorldGenerator.Generate(new WorldGenSettings { Width = 128, Height = 128 }, seed);
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 40,
+                // A bountiful valley so food never knife-edges the many specialists this colony fields.
+                ForagerNutritionPerDay = 7.0f, WoodcutterFirewoodPerDay = 9.0f,
+                ForagerShare = 0.40f, FarmerShare = 0.10f, WoodcutterShare = 0.10f, LoggerShare = 0.06f,
+                MinerShare = 0.05f, CraftsmanShare = 0.11f, MilitiaShare = 0.10f, ScholarShare = 0.05f,
+                StorehouseCapacity = 30000f,
+                StartingFoodUnits = 800f, StartingFirewoodUnits = 500f,
+                StartingWoodUnits = 80f, StartingStoneUnits = 60f,
+                EnableThreats = true,
+                EnablePopulationDynamics = true,
+                EnableTrade = true,
+                EnableTechnology = true
+            };
+            Settlement c = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+
+            // The founders arrive knowing the basics (techs 0..6); scholars will research the rest.
+            for (int t = 0; t <= 6; t++) ResearchSystem.Grant(c, t);
+
+            // Export the manufacturing surplus for silver.
+            c.TradePolicy.Sell(ResourceType.Planks).Sell(ResourceType.IronIngot);
+
+            int gx = c.CenterX, gy = c.CenterY;
+            PlaceComplete(c, BuildingType.Storehouse, gx + 1, gy);
+            for (int i = 0; i < 10; i++) PlaceComplete(c, BuildingType.House, gx + 2 + i, gy);
+            PlaceComplete(c, BuildingType.ForagerHut, gx - 1, gy);
+            PlaceComplete(c, BuildingType.WoodcutterCamp, gx - 2, gy);
+            PlaceComplete(c, BuildingType.Sawmill, gx, gy + 1);
+            PlaceComplete(c, BuildingType.Smelter, gx, gy + 2);
+            PlaceComplete(c, BuildingType.Smithy, gx, gy + 3);
+            PlaceComplete(c, BuildingType.Mill, gx, gy + 4);
+            PlaceComplete(c, BuildingType.Bakery, gx, gy + 5);
+            for (int i = 0; i < 8; i++) PlaceComplete(c, BuildingType.Field, gx - 1 - i, gy + 6);
+            PlaceComplete(c, BuildingType.Market, gx + 1, gy + 1);
+            for (int i = 0; i < 4; i++) PlaceComplete(c, BuildingType.Watchtower, gx + 1, gy + 2 + i); // a well-guarded town
+            PlaceComplete(c, BuildingType.Palisade, gx + 2, gy + 2);
+            c.Storehouse.Add(ResourceType.IronOre, ResourceQuality.Standard, 20f); // prime the smelter
+            return c;
+        }
+
+        private static int RunGrand(ulong seed, int years, int daysPerSeason)
+        {
+            if (years < 10) years = 25; // a full campaign plays out over decades
+            Settlement colony = FoundGrandColony(seed);
+
+            Console.WriteLine("Founder's Lands — grand campaign: every system at once (GDD, all modules)");
+            Console.WriteLine($"seed={seed}  start pop={colony.AlivePopulation}  housing={colony.HousingCapacity}  " +
+                              $"farming · production · trade · threats · demography · technology");
+            Console.WriteLine();
+            Console.WriteLine($"{"Year",4} {"Pop",4} {"Food",6} {"Bread",6} {"Silver",7} {"Tech",5} {"Bonus",6} {"Threat",-7} {"Raids",6} {"Health",7}");
+
+            int totalDays = years * daysPerSeason * 4;
+            for (int d = 0; d < totalDays; d++)
+            {
+                DayReport r = SettlementSimulation.Step(colony);
+                if (r.Day % (daysPerSeason * 4) == (daysPerSeason * 4 - 1))
+                {
+                    Console.WriteLine($"{r.Year,4} {colony.AlivePopulation,4} {r.FoodUnits,6:0} " +
+                                      $"{colony.Storehouse.Count(ResourceType.Bread),6:0} {colony.TradeLedger.Silver,7:0} " +
+                                      $"{colony.UnlockedTechs.Count + "/" + colony.Techs.Count,5} {colony.TechWorkBonus * 100f,5:0}% " +
+                                      $"{colony.Threat.Stage,-7} {colony.Threat.TotalRaids,6} {r.AvgHealth,7:0.0}");
+                }
+                if (colony.AlivePopulation == 0) { Console.WriteLine($"  -- the colony fell on day {r.Day} --"); break; }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"After {years} years: {colony.AlivePopulation} settlers, {colony.TradeLedger.Silver:0} silver, " +
+                              $"{colony.UnlockedTechs.Count}/{colony.Techs.Count} techs (+{colony.TechWorkBonus * 100f:0}% work), " +
+                              $"{colony.Threat.TotalRaids} raids survived; born {colony.TotalBirths}, arrived {colony.TotalImmigrants}.");
+            return 0;
         }
 
         // ---------------------------------------------------------------- technology (research tree)

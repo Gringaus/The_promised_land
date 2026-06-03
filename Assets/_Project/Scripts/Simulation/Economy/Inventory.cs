@@ -29,8 +29,13 @@ namespace FoundersLands.Simulation.Economy
         {
             get
             {
+                // Sum in fixed (type, quality) order, never dictionary order: float addition is not
+                // associative, so a storehouse rebuilt from a save must add its stacks in the same
+                // order as one grown in play, or the totals (and capacity clamping) would drift.
                 float sum = 0f;
-                foreach (var kv in _amounts) sum += kv.Value;
+                for (int t = 0; t <= (int)ResourceType.Bread; t++)
+                    for (int q = 0; q <= (int)ResourceQuality.Fine; q++)
+                        if (_amounts.TryGetValue(Key((ResourceType)t, (ResourceQuality)q), out float v)) sum += v;
                 return sum;
             }
         }

@@ -40,7 +40,8 @@ namespace FoundersLands.Simulation.SaveLoad
             sb.Append("SET ").Append(s.CenterX).Append(' ').Append(s.CenterY).Append(' ')
               .Append((int)s.PrimaryFood).Append(' ').Append((int)s.ForageQuality).Append(' ')
               .Append(F(s.FoodFactor)).Append(' ').Append(F(s.FirewoodFactor)).Append(' ')
-              .Append(F(s.StoneFactor)).Append(' ').Append(F(s.IronFactor)).Append('\n');
+              .Append(F(s.StoneFactor)).Append(' ').Append(F(s.IronFactor)).Append(' ')
+              .Append(F(s.SoilFertility)).Append('\n');
             sb.Append("CLK ").Append(s.Clock.Day).Append('\n');
             sb.Append("RNG ").Append(s.Rng.State.ToString(CultureInfo.InvariantCulture)).Append('\n');
             sb.Append("DTH ").Append(s.TotalDeaths).Append('\n');
@@ -62,6 +63,13 @@ namespace FoundersLands.Simulation.SaveLoad
 
             sb.Append("TEC ").Append(F(s.ResearchProgress)).Append(' ').Append(s.UnlockedTechs.Count);
             for (int i = 0; i < s.Techs.Count; i++) if (s.UnlockedTechs.Contains(i)) sb.Append(' ').Append(i);
+            sb.Append('\n');
+
+            // Standing trade orders (the player's policy) so a loaded game keeps trading the same way.
+            var orders = s.TradePolicy.Orders;
+            sb.Append("TPO ").Append(orders.Count);
+            for (int i = 0; i < orders.Count; i++)
+                sb.Append(' ').Append((int)orders[i].Type).Append(' ').Append((int)orders[i].Mode).Append(' ').Append(F(orders[i].Threshold));
             sb.Append('\n');
 
             sb.Append("CIT ").Append(s.Citizens.Count).Append('\n');
@@ -111,7 +119,7 @@ namespace FoundersLands.Simulation.SaveLoad
             int cx = 0, cy = 0, day = 0, deaths = 0;
             ResourceType primaryFood = ResourceType.Berries;
             ResourceQuality forage = ResourceQuality.Standard;
-            float foodFactor = 0f, firewoodFactor = 0f, stoneFactor = 0f, ironFactor = 0f, capacity = 0f;
+            float foodFactor = 0f, firewoodFactor = 0f, stoneFactor = 0f, ironFactor = 0f, soilFertility = 0f, capacity = 0f;
             ulong rngState = 0;
             float thrPressure = 0f, thrCamp = 0f, thrStolen = 0f;
             int thrStage = 0, thrDays = 0, thrRaids = 0, thrThefts = 0, thrCasualties = 0;
@@ -121,6 +129,7 @@ namespace FoundersLands.Simulation.SaveLoad
             int caravanVisits = 0, ambushes = 0;
             float researchProgress = 0f;
             var unlockedTechIds = new List<int>();
+            string[] tradeOrderTokens = null;
 
             var citizens = new List<string[]>();
             var stacks = new List<string[]>();
@@ -146,6 +155,7 @@ namespace FoundersLands.Simulation.SaveLoad
                         primaryFood = (ResourceType)Int(t[3]); forage = (ResourceQuality)Int(t[4]);
                         foodFactor = Flt(t[5]); firewoodFactor = Flt(t[6]); stoneFactor = Flt(t[7]);
                         if (t.Length > 8) ironFactor = Flt(t[8]);
+                        if (t.Length > 9) soilFertility = Flt(t[9]);
                         break;
                     case "CLK": day = Int(t[1]); break;
                     case "RNG": rngState = ulong.Parse(t[1], CultureInfo.InvariantCulture); break;
@@ -166,6 +176,7 @@ namespace FoundersLands.Simulation.SaveLoad
                         researchProgress = Flt(t[1]);
                         for (int j = 3; j < t.Length; j++) unlockedTechIds.Add(Int(t[j])); // t[2] = count
                         break;
+                    case "TPO": tradeOrderTokens = t; break;
                     case "STO": capacity = Flt(t[1]); break;
                     case "C": citizens.Add(t); break;
                     case "S": stacks.Add(t); break;
@@ -184,6 +195,7 @@ namespace FoundersLands.Simulation.SaveLoad
                 FirewoodFactor = firewoodFactor,
                 StoneFactor = stoneFactor,
                 IronFactor = ironFactor,
+                SoilFertility = soilFertility,
                 TotalDeaths = deaths,
                 Rng = new DeterministicRng(rngState)
             };
@@ -268,6 +280,19 @@ namespace FoundersLands.Simulation.SaveLoad
             s.TradeLedger.TotalImported = tradeImported;
             s.TradeLedger.SilverEarned = silverEarned;
             s.TradeLedger.SilverSpent = silverSpent;
+
+            if (tradeOrderTokens != null)
+            {
+                int n = Int(tradeOrderTokens[1]);
+                for (int j = 0; j < n; j++)
+                {
+                    var type = (ResourceType)Int(tradeOrderTokens[2 + j * 3]);
+                    int mode = Int(tradeOrderTokens[3 + j * 3]);
+                    float threshold = Flt(tradeOrderTokens[4 + j * 3]);
+                    if (mode == (int)TradeMode.Buy) s.TradePolicy.Buy(type, threshold);
+                    else s.TradePolicy.Sell(type, threshold);
+                }
+            }
 
             s.RecomputeBuildingEffects();
             return s;

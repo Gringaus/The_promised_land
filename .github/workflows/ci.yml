@@ -1,0 +1,51 @@
+name: CI
+
+# Builds and tests the engine-free simulation core (the "brain") on every push and PR.
+# The Unity presentation layer needs the Editor and a licence, so it is out of scope here —
+# the whole point of the Simulation/Presentation split is that this part runs headlessly.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulation:
+    name: Simulation core (build + tests)
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore SimHarness/FoundersLands.sln
+
+      - name: Build (Release)
+        run: dotnet build SimHarness/FoundersLands.sln -c Release --no-restore
+
+      - name: Test (Release)
+        run: dotnet test SimHarness/FoundersLands.sln -c Release --no-build --verbosity normal
+
+      - name: Smoke-run a few headless scenarios
+        run: |
+          run() { dotnet run --project SimHarness/console/FoundersLands.Console.csproj -c Release --no-build -- "$@"; }
+          run --mode survive --seed green-valley --years 2
+          run --mode build --seed green-valley --years 2
+          run --mode tech --seed green-valley

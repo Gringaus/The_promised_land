@@ -217,6 +217,14 @@ dotnet run --project console -c Release -- --mode tech --seed green-valley      
 
 Подробнее — `SimHarness/README.md`.
 
+**Непрерывная интеграция.** GitHub Actions (`.github/workflows/ci.yml`) на каждый push/PR
+собирает ядро и гоняет все 117 тестов плюс несколько headless-сценариев — Unity-слою
+лицензия и редактор не нужны, в этом и смысл разделения Simulation/Presentation.
+Качество гейтится сборкой без предупреждений (0 warnings) и тестами.
+
+**Claude Code на вебе.** SessionStart-хук (`.claude/hooks/session-start.sh`) в веб-сессиях
+заранее восстанавливает и собирает харнесс, чтобы тесты и CLI шли сразу, без ожидания.
+
 ---
 
 ## Открытие в Unity

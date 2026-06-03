@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <!-- Roll forward so the test host runs on a newer-only runtime (e.g. .NET 10) too. -->
+    <RollForward>Major</RollForward>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <IsPackable>false</IsPackable>

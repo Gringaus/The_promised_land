@@ -5,6 +5,9 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
+    <!-- Build targets .NET 8, but roll forward across a major version so the app also runs on a
+         machine that only has a newer runtime installed (e.g. .NET 10) without a separate .NET 8. -->
+    <RollForward>Major</RollForward>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <AssemblyName>FoundersLands.SimViewer</AssemblyName>

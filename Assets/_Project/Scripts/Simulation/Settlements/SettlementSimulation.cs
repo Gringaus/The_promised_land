@@ -6,6 +6,7 @@ using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Production;
 using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
+using FoundersLands.Simulation.Trade;
 
 namespace FoundersLands.Simulation.Settlements
 {
@@ -30,6 +31,7 @@ namespace FoundersLands.Simulation.Settlements
             Construct(s, season, efficiency);
             WearTools(s);
             ThreatSystem.Step(s, season); // bandits may steal/raid before the day's spoilage and meals
+            TradeSystem.Step(s);          // a caravan may sell surplus and buy needs (uses today's stock)
             s.Storehouse.ApplySpoilage(s.Catalog);
             int deaths = ConsumeAndAge(s, season);
             PopulationSystem.Step(s); // births, migration, aging — uses today's hunger and health

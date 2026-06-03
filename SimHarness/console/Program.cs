@@ -12,6 +12,7 @@ using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.SaveLoad;
 using FoundersLands.Simulation.Settlements;
 using FoundersLands.Simulation.Threats;
+using FoundersLands.Simulation.Trade;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.World;
 using Path = FoundersLands.Simulation.Pathfinding.Path;
@@ -57,6 +58,7 @@ namespace FoundersLands.SimViewer
             if (mode == "raiders") return RunRaiders(seed, years, daysPerSeason);
             if (mode == "farming") return RunFarming(seed, years, daysPerSeason);
             if (mode == "demography") return RunDemography(seed, years, daysPerSeason);
+            if (mode == "trade") return RunTrade(seed, years, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -330,6 +332,59 @@ namespace FoundersLands.SimViewer
             Building b = colony.PlaceBlueprint(type, x, y);
             b.WorkDone = b.WorkRequired;
             b.Complete = true;
+        }
+
+        // ---------------------------------------------------------------- trade (caravans & contracts)
+
+        private static int RunTrade(ulong seed, int years, int daysPerSeason)
+        {
+            WorldMap map = WorldGenerator.Generate(new WorldGenSettings { Width = 128, Height = 128 }, seed);
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 30,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.52f, WoodcutterShare = 0.16f, LoggerShare = 0.16f, CraftsmanShare = 0.13f,
+                StorehouseCapacity = 20000f,
+                StartingFoodUnits = 600f, StartingFirewoodUnits = 350f, StartingWoodUnits = 40f,
+                EnableTrade = true
+            };
+            Settlement colony = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+
+            // A timber-and-sawmill town: it exports planks and imports the tools it can't forge.
+            colony.TradePolicy.Sell(ResourceType.Planks, reserve: 0f).Buy(ResourceType.Tools, target: 80f);
+
+            int gx = colony.CenterX, gy = colony.CenterY;
+            PlaceComplete(colony, BuildingType.Storehouse, gx + 1, gy);
+            for (int i = 0; i < 7; i++) PlaceComplete(colony, BuildingType.House, gx + 2 + i, gy);
+            PlaceComplete(colony, BuildingType.Sawmill, gx, gy + 1);
+            PlaceComplete(colony, BuildingType.Market, gx, gy + 2);
+
+            Console.WriteLine("Founder's Lands — trade & contracts (GDD §12)");
+            Console.WriteLine($"seed={seed}  pop={colony.AlivePopulation}  market+sawmill; sells Planks, buys Tools; caravan every {config.TradeIntervalDays} days");
+            Console.WriteLine();
+            Console.WriteLine($"{"Year",4} {"Season",-7} {"Pop",4} {"Planks",7} {"Tools",6} {"Silver",8} {"Visits",7} {"Exp",6} {"Imp",5} {"Health",7}");
+
+            int totalDays = years * daysPerSeason * 4;
+            for (int d = 0; d < totalDays; d++)
+            {
+                DayReport r = SettlementSimulation.Step(colony);
+                if ((r.Day % daysPerSeason) == (daysPerSeason - 1))
+                {
+                    TradeLedger t = colony.TradeLedger;
+                    Console.WriteLine($"{r.Year,4} {r.Season,-7} {r.Population,4} " +
+                                      $"{colony.Storehouse.Count(ResourceType.Planks),7:0} {colony.Storehouse.Count(ResourceType.Tools),6:0} " +
+                                      $"{t.Silver,8:0} {t.CaravanVisits,7} {t.TotalExported,6:0} {t.TotalImported,5:0} {r.AvgHealth,7:0.0}");
+                }
+                if (colony.AlivePopulation == 0) { Console.WriteLine($"  -- wiped out day {r.Day} --"); break; }
+            }
+
+            TradeLedger led = colony.TradeLedger;
+            Console.WriteLine();
+            Console.WriteLine($"Trade over {years} years: {led.CaravanVisits} caravans, " +
+                              $"{led.TotalExported:0} planks exported for {led.SilverEarned:0} silver, " +
+                              $"{led.TotalImported:0} tools imported for {led.SilverSpent:0}; purse {led.Silver:0} silver.");
+            return 0;
         }
 
         // ---------------------------------------------------------------- demography (births/aging/migration)

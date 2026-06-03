@@ -9,6 +9,7 @@ using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Settlements;
 using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
+using FoundersLands.Simulation.Trade;
 using FoundersLands.Simulation.World;
 
 namespace FoundersLands.Simulation.SaveLoad
@@ -53,6 +54,11 @@ namespace FoundersLands.Simulation.SaveLoad
             sb.Append("POP ").Append(F(s.BirthProgress)).Append(' ').Append(F(s.MigrationProgress)).Append(' ')
               .Append(s.NextCitizenId).Append(' ').Append(s.TotalBirths).Append(' ')
               .Append(s.TotalImmigrants).Append(' ').Append(s.TotalLeft).Append(' ').Append(s.NaturalDeaths).Append('\n');
+
+            TradeLedger tl = s.TradeLedger;
+            sb.Append("TRD ").Append(F(tl.Silver)).Append(' ').Append(tl.CaravanVisits).Append(' ')
+              .Append(tl.Ambushes).Append(' ').Append(F(tl.TotalExported)).Append(' ').Append(F(tl.TotalImported)).Append(' ')
+              .Append(F(tl.SilverEarned)).Append(' ').Append(F(tl.SilverSpent)).Append('\n');
 
             sb.Append("CIT ").Append(s.Citizens.Count).Append('\n');
             for (int i = 0; i < s.Citizens.Count; i++)
@@ -107,6 +113,8 @@ namespace FoundersLands.Simulation.SaveLoad
             int thrStage = 0, thrDays = 0, thrRaids = 0, thrThefts = 0, thrCasualties = 0;
             float birthProgress = 0f, migrationProgress = 0f;
             int nextId = 0, totalBirths = 0, totalImmigrants = 0, totalLeft = 0, naturalDeaths = 0;
+            float silver = 0f, tradeExported = 0f, tradeImported = 0f, silverEarned = 0f, silverSpent = 0f;
+            int caravanVisits = 0, ambushes = 0;
 
             var citizens = new List<string[]>();
             var stacks = new List<string[]>();
@@ -143,6 +151,10 @@ namespace FoundersLands.Simulation.SaveLoad
                     case "POP":
                         birthProgress = Flt(t[1]); migrationProgress = Flt(t[2]); nextId = Int(t[3]);
                         totalBirths = Int(t[4]); totalImmigrants = Int(t[5]); totalLeft = Int(t[6]); naturalDeaths = Int(t[7]);
+                        break;
+                    case "TRD":
+                        silver = Flt(t[1]); caravanVisits = Int(t[2]); ambushes = Int(t[3]);
+                        tradeExported = Flt(t[4]); tradeImported = Flt(t[5]); silverEarned = Flt(t[6]); silverSpent = Flt(t[7]);
                         break;
                     case "STO": capacity = Flt(t[1]); break;
                     case "C": citizens.Add(t); break;
@@ -227,6 +239,14 @@ namespace FoundersLands.Simulation.SaveLoad
             s.TotalImmigrants = totalImmigrants;
             s.TotalLeft = totalLeft;
             s.NaturalDeaths = naturalDeaths;
+
+            s.TradeLedger.Silver = silver;
+            s.TradeLedger.CaravanVisits = caravanVisits;
+            s.TradeLedger.Ambushes = ambushes;
+            s.TradeLedger.TotalExported = tradeExported;
+            s.TradeLedger.TotalImported = tradeImported;
+            s.TradeLedger.SilverEarned = silverEarned;
+            s.TradeLedger.SilverSpent = silverSpent;
 
             s.RecomputeBuildingEffects();
             return s;

@@ -6,6 +6,7 @@ using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Production;
 using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
+using FoundersLands.Simulation.Trade;
 using FoundersLands.Simulation.World;
 
 namespace FoundersLands.Simulation.Settlements
@@ -65,6 +66,11 @@ namespace FoundersLands.Simulation.Settlements
         // AI Director state (GDD §13); inert while Config.EnableThreats is false.
         public readonly ThreatState Threat = new ThreatState();
 
+        // Trade (GDD §12); inert while Config.EnableTrade is false. Policy is the colony's standing
+        // buy/sell orders; the ledger holds its silver and tally.
+        public readonly TradePolicy TradePolicy = new TradePolicy();
+        public readonly TradeLedger TradeLedger = new TradeLedger();
+
         public Settlement(WorldMap map, int centerX, int centerY, SettlementConfig config,
             ResourceCatalog catalog, SeasonDef[] seasons, BuildingCatalog buildingCatalog = null,
             RecipeCatalog recipes = null)
@@ -80,6 +86,7 @@ namespace FoundersLands.Simulation.Settlements
             Storehouse = new Inventory(config.StorehouseCapacity);
             BaseStorageCapacity = config.StorehouseCapacity;
             Clock = new SimulationClock(config.DaysPerSeason);
+            TradeLedger.Silver = config.StartingSilver;
         }
 
         public int AlivePopulation
@@ -183,6 +190,7 @@ namespace FoundersLands.Simulation.Settlements
             h = StableHash.Combine(h, Buildings.Count);
             for (int i = 0; i < Buildings.Count; i++) h = Buildings[i].Hash(h);
             h = Threat.Hash(h);
+            h = TradeLedger.Hash(h);
             h = StableHash.Combine(h, (int)(BirthProgress * 1000f));
             h = StableHash.Combine(h, (int)(MigrationProgress * 1000f));
             h = StableHash.Combine(h, TotalBirths);

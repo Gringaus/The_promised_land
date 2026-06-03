@@ -120,6 +120,14 @@ namespace FoundersLands.Simulation.Settlements
         // capacity. As the workforce expands (migrants, children come of age) capacity rises.
         public float GrowthFoodHeadroom = 0.70f;
 
+        // Trade (Module 11, GDD §12). Off by default so colonies that own a market in earlier
+        // modules (production, raiders) keep their behaviour; the trade scenario turns it on.
+        public bool EnableTrade = false;
+        public int TradeIntervalDays = 12;       // a caravan visits on this cadence
+        public float MerchantMargin = 0.25f;     // spread between buy and sell prices
+        public float CaravanCapacity = 250f;     // max units moved per visit (scaled by route safety)
+        public float StartingSilver = 0f;
+
         // Health dynamics.
         public float StarveHealthLossPerDay = 16f;
         public float ColdHealthLossPerDay = 16f;

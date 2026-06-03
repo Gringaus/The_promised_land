@@ -25,6 +25,9 @@ namespace FoundersLands.Simulation.Economy
         /// <summary>Whether the good is used for construction (GDD §10).</summary>
         public bool BuildingMaterial;
 
+        /// <summary>Reference market value per unit, in silver (GDD §12 trade). 0 = not traded.</summary>
+        public float BasePrice;
+
         public bool IsFood { get { return Nutrition > 0f; } }
         public bool IsFuel { get { return HeatValue > 0f; } }
 

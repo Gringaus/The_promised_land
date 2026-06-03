@@ -86,6 +86,16 @@ namespace FoundersLands.Simulation.Construction
                 { WorkRequired = 60f }
                 .Needs(ResourceType.Wood, 16f).Needs(ResourceType.Stone, 14f));
 
+            // Storage & preserving (Module 16, GDD §8). A cool cellar and a smokehouse slow how
+            // fast perishable food rots, so a colony keeps more of its harvest through winter.
+            c.Add(new BuildingDef(BuildingType.Cellar, "Root cellar")
+                { WorkRequired = 70f, SpoilageReduction = 0.40f }
+                .Needs(ResourceType.Wood, 14f).Needs(ResourceType.Stone, 18f));
+
+            c.Add(new BuildingDef(BuildingType.Smokehouse, "Smokehouse")
+                { WorkRequired = 55f, SpoilageReduction = 0.30f }
+                .Needs(ResourceType.Wood, 18f));
+
             return c;
         }
     }

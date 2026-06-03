@@ -36,6 +36,7 @@ namespace FoundersLands.Simulation.Construction
         public float ForagerBonus;      // +fraction to forager output
         public float WoodcutterBonus;   // +fraction to woodcutter output
         public float DefenseBonus;      // defence points vs bandits (GDD §13)
+        public float SpoilageReduction; // 0..1 fraction by which it slows food spoilage (GDD §8)
 
         public BuildingDef(BuildingType type, string name)
         {

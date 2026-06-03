@@ -34,7 +34,7 @@ namespace FoundersLands.Simulation.Settlements
             WearTools(s);
             ThreatSystem.Step(s, season); // bandits may steal/raid before the day's spoilage and meals
             TradeSystem.Step(s);          // a caravan may sell surplus and buy needs (uses today's stock)
-            s.Storehouse.ApplySpoilage(s.Catalog);
+            s.TotalSpoiled += s.Storehouse.ApplySpoilage(s.Catalog, s.SpoilageReductionFactor); // cellars slow rot (§8)
             int deaths = ConsumeAndAge(s, season);
             PopulationSystem.Step(s); // births, migration, aging — uses today's hunger and health
 

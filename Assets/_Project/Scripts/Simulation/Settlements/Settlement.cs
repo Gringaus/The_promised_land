@@ -50,7 +50,10 @@ namespace FoundersLands.Simulation.Settlements
         public float ForagerBonus;
         public float WoodcutterBonus;
         public float BuildingDefense; // defence from completed towers/palisade (GDD §13)
+        public float SpoilageReductionFactor; // 0..~0.85, from cellars/smokehouses (GDD §8)
         public readonly float BaseStorageCapacity;
+
+        public float TotalSpoiled; // running total of food lost to spoilage (reporting stat)
 
         public DeterministicRng Rng;
 
@@ -179,6 +182,7 @@ namespace FoundersLands.Simulation.Settlements
         {
             int housing = 0;
             float shelterWeighted = 0f, storage = 0f, forager = 0f, woodcutter = 0f, defense = 0f;
+            float keptFraction = 1f; // multiplied down by each preserver (diminishing returns)
 
             for (int i = 0; i < Buildings.Count; i++)
             {
@@ -191,6 +195,7 @@ namespace FoundersLands.Simulation.Settlements
                 forager += def.ForagerBonus;
                 woodcutter += def.WoodcutterBonus;
                 defense += def.DefenseBonus;
+                if (def.SpoilageReduction > 0f) keptFraction *= 1f - def.SpoilageReduction;
             }
 
             HousingCapacity = housing;
@@ -198,6 +203,8 @@ namespace FoundersLands.Simulation.Settlements
             ForagerBonus = forager;
             WoodcutterBonus = woodcutter;
             BuildingDefense = defense;
+            // Combined preservation, capped: even a cellar + smokehouse can't stop spoilage entirely.
+            SpoilageReductionFactor = (1f - keptFraction) > 0.85f ? 0.85f : 1f - keptFraction;
             Storehouse.Capacity = BaseStorageCapacity + storage;
         }
 

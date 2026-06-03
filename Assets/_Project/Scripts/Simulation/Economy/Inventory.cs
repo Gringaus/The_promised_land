@@ -162,16 +162,24 @@ namespace FoundersLands.Simulation.Economy
             return list;
         }
 
-        /// <summary>Apply one day of spoilage to perishable goods.</summary>
-        public void ApplySpoilage(ResourceCatalog catalog)
+        /// <summary>
+        /// Apply one day of spoilage to perishable goods, slowed by <paramref name="spoilageReduction"/>
+        /// (0 = none, 1 = food never rots — see GDD §8 cellars/smokehouses). Returns units lost.
+        /// </summary>
+        public float ApplySpoilage(ResourceCatalog catalog, float spoilageReduction = 0f)
         {
+            float mult = 1f - spoilageReduction;
+            if (mult < 0f) mult = 0f; else if (mult > 1f) mult = 1f;
+
+            float spoiled = 0f;
             foreach (ItemStack s in Stacks())
             {
                 ResourceDef def = catalog.Get(s.Type);
                 if (!def.Perishable || def.DailySpoilFraction <= 0f) continue;
-                float lost = s.Amount * def.DailySpoilFraction;
-                if (lost > 0f) Remove(s.Type, s.Quality, lost);
+                float lost = s.Amount * def.DailySpoilFraction * mult;
+                if (lost > 0f) { Remove(s.Type, s.Quality, lost); spoiled += lost; }
             }
+            return spoiled;
         }
 
         /// <summary>Fold inventory contents into a stable hash for determinism tests.</summary>

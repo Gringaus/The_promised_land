@@ -39,7 +39,7 @@ namespace FoundersLands.Simulation.Technology
             int woodcraft = c.Add("Woodcraft", 60f, null,
                 new[] { BuildingType.WoodcutterCamp, BuildingType.Sawmill }, 0.05f);
             int agriculture = c.Add("Agriculture", 90f, null,
-                new[] { BuildingType.Field, BuildingType.Mill, BuildingType.Bakery }, 0f);
+                new[] { BuildingType.Field, BuildingType.Mill, BuildingType.Bakery, BuildingType.Cellar, BuildingType.Smokehouse }, 0f);
             int commerce = c.Add("Commerce", 110f, new[] { woodcraft },
                 new[] { BuildingType.Market }, 0f);
             int masonry = c.Add("Masonry", 100f, new[] { woodcraft },

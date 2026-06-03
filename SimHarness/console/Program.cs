@@ -62,6 +62,7 @@ namespace FoundersLands.SimViewer
             if (mode == "trade") return RunTrade(seed, years, daysPerSeason);
             if (mode == "tech") return RunTech(seed, years, daysPerSeason);
             if (mode == "grand") return RunGrand(seed, years, daysPerSeason);
+            if (mode == "preserve") return RunPreserve(seed, years, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -335,6 +336,63 @@ namespace FoundersLands.SimViewer
             Building b = colony.PlaceBlueprint(type, x, y);
             b.WorkDone = b.WorkRequired;
             b.Complete = true;
+        }
+
+        // ---------------------------------------------------------------- storage & preserving (§8)
+
+        private static Settlement FoundForagerColony(ulong seed, int daysPerSeason)
+        {
+            WorldMap map = WorldGenerator.Generate(new WorldGenSettings { Width = 128, Height = 128 }, seed);
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 20,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.62f, WoodcutterShare = 0.30f,
+                StartingFoodUnits = 220f, StartingFirewoodUnits = 220f
+            };
+            Settlement c = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+            int gx = c.CenterX, gy = c.CenterY;
+            PlaceComplete(c, BuildingType.Storehouse, gx + 1, gy);
+            for (int i = 0; i < 4; i++) PlaceComplete(c, BuildingType.House, gx + 2 + i, gy);
+            return c;
+        }
+
+        private static int RunPreserve(ulong seed, int years, int daysPerSeason)
+        {
+            if (years < 3) years = 6;
+
+            // Two identical forager colonies; only the second keeps a cellar and a smokehouse, so
+            // the difference in food kept and food lost is purely the preservation buildings (§8).
+            Settlement plain = FoundForagerColony(seed, daysPerSeason);
+            Settlement kept = FoundForagerColony(seed, daysPerSeason);
+            PlaceComplete(kept, BuildingType.Cellar, kept.CenterX, kept.CenterY + 1);
+            PlaceComplete(kept, BuildingType.Smokehouse, kept.CenterX, kept.CenterY + 2);
+            kept.RecomputeBuildingEffects();
+
+            Console.WriteLine("Founder's Lands — storage & preserving (GDD §8)");
+            Console.WriteLine($"seed={seed}  two identical forager camps; the second adds a root cellar + smokehouse " +
+                              $"(spoilage −{kept.SpoilageReductionFactor * 100f:0}%)");
+            Console.WriteLine();
+            Console.WriteLine($"{"Year",4} {"Season",-7} | {"plain food",10} {"lost",7} | {"preserved food",14} {"lost",7}");
+
+            int totalDays = years * daysPerSeason * 4;
+            for (int d = 0; d < totalDays; d++)
+            {
+                SettlementSimulation.Step(plain);
+                DayReport r = SettlementSimulation.Step(kept);
+                if ((r.Day % daysPerSeason) == (daysPerSeason - 1))
+                {
+                    Console.WriteLine($"{r.Year,4} {r.Season,-7} | {plain.FoodUnits(),10:0} {plain.TotalSpoiled,7:0} | " +
+                                      $"{kept.FoodUnits(),14:0} {kept.TotalSpoiled,7:0}");
+                }
+            }
+
+            float saved = plain.TotalSpoiled - kept.TotalSpoiled;
+            Console.WriteLine();
+            Console.WriteLine($"Over {years} years the cellar + smokehouse saved {saved:0} units from spoiling " +
+                              $"({plain.TotalSpoiled:0} → {kept.TotalSpoiled:0}); food on hand {plain.FoodUnits():0} → {kept.FoodUnits():0}.");
+            return 0;
         }
 
         // ---------------------------------------------------------------- grand campaign (all systems at once)

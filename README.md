@@ -276,6 +276,13 @@ dotnet run --project console -c Release -- --mode play --seed green-valley
 dotnet run --project console -c Release -- --mode play --commands "build house; labor builder 0.2; year; year"
 ```
 
+> Команды выше запускаются **из папки `SimHarness/`** (см. `cd SimHarness` в начале блока).
+> Если вы в корне репозитория — укажите путь полностью, тогда `cd` не нужен:
+>
+> ```bash
+> dotnet run --project SimHarness/console -c Release -- --mode play --seed green-valley
+> ```
+
 Подробнее — `SimHarness/README.md`.
 
 **Непрерывная интеграция.** GitHub Actions (`.github/workflows/ci.yml`) на каждый push/PR

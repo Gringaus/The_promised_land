@@ -15,3 +15,36 @@ Rules:
 
 Code in this folder is added during the Unity-Editor stages (it needs a GPU and the
 Editor, which the headless build environment does not have).
+
+## What's here (Module 10 scaffold)
+
+A first runnable slice that makes the core visible in the Editor without any HDRP/scene
+authoring. It uses IMGUI + a generated texture, so it works in any render pipeline.
+
+- `Authoring/WorldGenSettingsAsset`, `Authoring/SettlementConfigAsset` — `ScriptableObject`
+  wrappers (menu **Founder's Lands ▸ …**). Tune map/colony in the Inspector; `ToSettings()` /
+  `ToConfig()` build the plain records the core consumes.
+- `Runtime/ColonyHost` — the bridge: generates the world + colony from a seed (and optional
+  assets) and advances `SettlementSimulation` in step with real time (`days/second`).
+- `Runtime/WorldMapTextureBuilder` — paints a `WorldMap` into a `Texture2D` (biome colour,
+  elevation relief, resource flecks).
+- `Runtime/ColonyDebugOverlay` — an IMGUI overlay drawing the map and a live read-out
+  (season, population, food/fuel, goods, buildings, and — when enabled — threat and
+  demographics), plus pause/speed/regenerate controls.
+- `Runtime/ColonyAutoBootstrap` — optional: with the scripting define `FOUNDERSLANDS_AUTORUN`,
+  spawns the host + overlay automatically so any scene runs the sim.
+
+### Run it
+
+1. Open the project in Unity (HDRP 6.x). Let it import and compile the assemblies.
+2. In any scene, create an empty GameObject and add **Colony Host** (the overlay is added
+   automatically via `[RequireComponent]`). Optionally assign authored config assets and set
+   the seed (e.g. `green-valley` — the same seed reproduces the CLI world exactly).
+3. Press **Play**. The procedural map and a live colony read-out appear; use the on-screen
+   buttons to pause, change speed, or regenerate.
+
+Alternatively, add `FOUNDERSLANDS_AUTORUN` to *Project Settings ▸ Player ▸ Scripting Define
+Symbols* and just press Play in an empty scene.
+
+The same balance runs headlessly in `/SimHarness` (see `/README.md`), so behaviour can be
+verified on the CLI before it is ever drawn.

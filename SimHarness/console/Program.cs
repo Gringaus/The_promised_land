@@ -5,10 +5,14 @@ using System.Text;
 using FoundersLands.Simulation.Construction;
 using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
+using FoundersLands.Simulation.Logistics;
+using FoundersLands.Simulation.Mathematics;
+using FoundersLands.Simulation.Pathfinding;
 using FoundersLands.Simulation.SaveLoad;
 using FoundersLands.Simulation.Settlements;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.World;
+using Path = FoundersLands.Simulation.Pathfinding.Path;
 
 namespace FoundersLands.SimViewer
 {
@@ -46,6 +50,7 @@ namespace FoundersLands.SimViewer
             if (mode == "survive") return RunSurvival(seed, years, pop, daysPerSeason);
             if (mode == "build") return RunBuild(seed, years, pop, daysPerSeason);
             if (mode == "saveload") return RunSaveLoad(seed, daysPerSeason);
+            if (mode == "logistics") return RunLogistics(seed);
             return RunMapPreview(seed, width, height);
         }
 
@@ -256,6 +261,128 @@ namespace FoundersLands.SimViewer
                 }
             }
             return list;
+        }
+
+        // ---------------------------------------------------------------- logistics
+
+        private static int RunLogistics(ulong seed)
+        {
+            var settings = new WorldGenSettings { Width = 96, Height = 96 };
+            WorldMap map = WorldGenerator.Generate(settings, seed);
+
+            Coord site = FindLand(map, map.Width / 2, map.Height / 2);
+            Coord target = FindResourceFar(map, site, ResourceNodeKind.Wood, 18);
+
+            var roads = new RoadNetwork(map.Width, map.Height);
+            var cost = new MovementCost(map, roads, snow: 0f);
+
+            Path first = Pathfinder.Find(cost, map.Width, map.Height, site, target);
+            if (!first.Found)
+            {
+                Console.WriteLine("No land route between site and target on this seed.");
+                return 1;
+            }
+
+            Console.WriteLine("Founder's Lands — logistics & living roads (GDD §7, §12)");
+            Console.WriteLine($"seed={seed}  site={site}  target={target}  pathTiles={first.Length}");
+            Console.WriteLine($"initial route cost (wilderness): {first.Cost:0.0}");
+            Console.WriteLine();
+            Console.WriteLine($"{"trip",4} {"routeCost",10} {"trails",7} {"roads",6}");
+
+            const float trafficPerTrip = 3f;
+            for (int trip = 1; trip <= 30; trip++)
+            {
+                Path path = Pathfinder.Find(cost, map.Width, map.Height, site, target);
+                LogisticsSystem.StampRoute(roads, path, trafficPerTrip);
+
+                if (trip == 1 || trip == 3 || trip == 5 || trip == 10 || trip == 20 || trip == 30)
+                {
+                    CountRoads(roads, out int trails, out int builtRoads);
+                    Console.WriteLine($"{trip,4} {path.Cost,10:0.0} {trails,7} {builtRoads,6}");
+                }
+            }
+
+            Path final = Pathfinder.Find(cost, map.Width, map.Height, site, target);
+            Console.WriteLine();
+            Console.WriteLine($"final route cost (worn road): {final.Cost:0.0}  " +
+                              $"({100f * (1f - final.Cost / first.Cost):0}% cheaper than wilderness)");
+            Console.WriteLine();
+            DrawRoute(map, roads, site, target);
+            return 0;
+        }
+
+        private static Coord FindLand(WorldMap map, int cx, int cy)
+        {
+            for (int r = 0; r < map.Width; r++)
+            {
+                for (int dy = -r; dy <= r; dy++)
+                {
+                    for (int dx = -r; dx <= r; dx++)
+                    {
+                        if (dx > -r && dx < r && dy > -r && dy < r) continue;
+                        int x = cx + dx, y = cy + dy;
+                        if (map.InBounds(x, y) && !map.Get(x, y).IsWater) return new Coord(x, y);
+                    }
+                }
+            }
+            return new Coord(cx, cy);
+        }
+
+        private static Coord FindResourceFar(WorldMap map, Coord from, ResourceNodeKind kind, int minDist)
+        {
+            Coord best = from;
+            int bestScore = int.MaxValue;
+            for (int y = 0; y < map.Height; y++)
+            {
+                for (int x = 0; x < map.Width; x++)
+                {
+                    if (map.Get(x, y).Resource != kind) continue;
+                    int dist = new Coord(x, y).ChebyshevTo(from);
+                    if (dist < minDist) continue;
+                    int score = dist; // prefer the closest node beyond the minimum distance
+                    if (score < bestScore) { bestScore = score; best = new Coord(x, y); }
+                }
+            }
+            return best;
+        }
+
+        private static void CountRoads(RoadNetwork roads, out int trails, out int builtRoads)
+        {
+            trails = 0; builtRoads = 0;
+            for (int y = 0; y < roads.Height; y++)
+            {
+                for (int x = 0; x < roads.Width; x++)
+                {
+                    RoadLevel l = roads.LevelAt(x, y);
+                    if (l == RoadLevel.Trail) trails++;
+                    else if (l == RoadLevel.Road) builtRoads++;
+                }
+            }
+        }
+
+        private static void DrawRoute(WorldMap map, RoadNetwork roads, Coord site, Coord target)
+        {
+            int minX = Math.Max(0, Math.Min(site.X, target.X) - 2);
+            int maxX = Math.Min(map.Width - 1, Math.Max(site.X, target.X) + 2);
+            int minY = Math.Max(0, Math.Min(site.Y, target.Y) - 2);
+            int maxY = Math.Min(map.Height - 1, Math.Max(site.Y, target.Y) + 2);
+            if (maxX - minX > 78) return;
+
+            Console.WriteLine("Worn route (S=site, X=target, ==road, --trail):");
+            for (int y = minY; y <= maxY; y++)
+            {
+                var sb = new StringBuilder();
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (x == site.X && y == site.Y) { sb.Append('S'); continue; }
+                    if (x == target.X && y == target.Y) { sb.Append('X'); continue; }
+                    RoadLevel l = roads.LevelAt(x, y);
+                    if (l == RoadLevel.Road) { sb.Append('='); continue; }
+                    if (l == RoadLevel.Trail) { sb.Append('-'); continue; }
+                    sb.Append(map.Get(x, y).IsWater ? '~' : '.');
+                }
+                Console.WriteLine(sb.ToString());
+            }
         }
 
         // ---------------------------------------------------------------- map preview

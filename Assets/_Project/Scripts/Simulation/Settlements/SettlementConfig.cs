@@ -46,6 +46,12 @@ namespace FoundersLands.Simulation.Settlements
         public float MinFirewoodFactor = 0.1f;
         public float MinStoneFactor = 0.05f;
 
+        // Opt-in: weight resource potential by real path distance from the site (Dijkstra)
+        // instead of a flat radius, so rivers, marsh and distance shape the economy
+        // (GDD §3, §12). Default off keeps the Module 2/3 balance unchanged.
+        public bool UsePathWeightedPotential = false;
+        public float PathPotentialScale = 12f;
+
         // Sheltered citizens need less firewood. Fully housed in good shelter cuts the
         // winter fuel demand by up to this fraction (GDD §10 housing/warmth).
         public float WarmthReductionMax = 0.5f;

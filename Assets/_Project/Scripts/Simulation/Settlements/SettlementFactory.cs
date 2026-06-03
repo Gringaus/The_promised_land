@@ -1,6 +1,7 @@
 using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Mathematics;
+using FoundersLands.Simulation.Pathfinding;
 using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.World;
@@ -30,6 +31,12 @@ namespace FoundersLands.Simulation.Settlements
 
             ScanSurroundings(map, cx, cy, config.GatherRadius,
                 out float berries, out float fish, out float meat, out float wood, out float stone, out float avgFertility);
+
+            // Optionally re-weight resource potential by real path distance (GDD §3, §12).
+            if (config.UsePathWeightedPotential)
+            {
+                ScanWeighted(map, cx, cy, config, out berries, out fish, out meat, out wood, out stone);
+            }
 
             var settlement = new Settlement(map, cx, cy, config, catalog, seasons)
             {
@@ -113,6 +120,63 @@ namespace FoundersLands.Simulation.Settlements
             }
 
             avgFertility = land > 0 ? fertSum / land : 0f;
+        }
+
+        // Weight each resource node by exp(-pathCost/scale) from the site, so far or
+        // marsh-locked deposits count for less. Aquatic nodes (fish) are reached from the
+        // nearest walkable shore tile, since open water is impassable.
+        private static void ScanWeighted(WorldMap map, int cx, int cy, SettlementConfig config,
+            out float berries, out float fish, out float meat, out float wood, out float stone)
+        {
+            berries = fish = meat = wood = stone = 0f;
+
+            var cost = new MovementCost(map);
+            float[] dist = DistanceField.Compute(cost, map.Width, map.Height, new Coord(cx, cy));
+            float scale = config.PathPotentialScale <= 0f ? 1f : config.PathPotentialScale;
+
+            for (int y = 0; y < map.Height; y++)
+            {
+                for (int x = 0; x < map.Width; x++)
+                {
+                    Tile t = map.Get(x, y);
+                    if (t.Resource == ResourceNodeKind.None) continue;
+
+                    float d = EffectiveDistance(map, dist, x, y);
+                    if (float.IsPositiveInfinity(d)) continue; // unreachable contributes nothing
+
+                    float amt = t.ResourceAmount * (float)System.Math.Exp(-d / scale);
+                    switch (t.Resource)
+                    {
+                        case ResourceNodeKind.Berries: berries += amt; break;
+                        case ResourceNodeKind.Fish: fish += amt; break;
+                        case ResourceNodeKind.Game: meat += amt; break;
+                        case ResourceNodeKind.Wood: wood += amt; break;
+                        case ResourceNodeKind.Stone: stone += amt; break;
+                        case ResourceNodeKind.IronOre: stone += amt * 0.5f; break;
+                    }
+                }
+            }
+        }
+
+        private static float EffectiveDistance(WorldMap map, float[] dist, int x, int y)
+        {
+            float d = dist[y * map.Width + x];
+            if (!float.IsPositiveInfinity(d)) return d;
+
+            // Water tile (impassable): use the nearest walkable neighbour (shore access).
+            float best = float.PositiveInfinity;
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    int nx = x + dx, ny = y + dy;
+                    if (!map.InBounds(nx, ny)) continue;
+                    float nd = dist[ny * map.Width + nx];
+                    if (nd < best) best = nd;
+                }
+            }
+            return best;
         }
 
         private static ResourceType PickPrimaryFood(float berries, float fish, float meat)

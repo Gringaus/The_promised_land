@@ -212,6 +212,7 @@ namespace FoundersLands.Simulation.Settlements
             int craftsmen = (int)System.Math.Round(pop * config.CraftsmanShare);
             int militia = (int)System.Math.Round(pop * config.MilitiaShare);
             int farmers = (int)System.Math.Round(pop * config.FarmerShare);
+            int scholars = (int)System.Math.Round(pop * config.ScholarShare);
 
             // Cumulative thresholds; any remainder becomes idle.
             int tF = foragers;
@@ -223,6 +224,7 @@ namespace FoundersLands.Simulation.Settlements
             int tC = tM + craftsmen;
             int tMil = tC + militia;
             int tFarm = tMil + farmers;
+            int tSch = tFarm + scholars;
 
             for (int i = 0; i < pop; i++)
             {
@@ -235,6 +237,7 @@ namespace FoundersLands.Simulation.Settlements
                                 : i < tC ? Profession.Craftsman
                                 : i < tMil ? Profession.Militiaman
                                 : i < tFarm ? Profession.Farmer
+                                : i < tSch ? Profession.Scholar
                                 : Profession.Idle;
 
                 string name = Names[s.Rng.NextInt(0, Names.Length)];

@@ -11,6 +11,7 @@ using FoundersLands.Simulation.Pathfinding;
 using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.SaveLoad;
 using FoundersLands.Simulation.Settlements;
+using FoundersLands.Simulation.Technology;
 using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Trade;
 using FoundersLands.Simulation.Time;
@@ -59,6 +60,7 @@ namespace FoundersLands.SimViewer
             if (mode == "farming") return RunFarming(seed, years, daysPerSeason);
             if (mode == "demography") return RunDemography(seed, years, daysPerSeason);
             if (mode == "trade") return RunTrade(seed, years, daysPerSeason);
+            if (mode == "tech") return RunTech(seed, years, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -332,6 +334,57 @@ namespace FoundersLands.SimViewer
             Building b = colony.PlaceBlueprint(type, x, y);
             b.WorkDone = b.WorkRequired;
             b.Complete = true;
+        }
+
+        // ---------------------------------------------------------------- technology (research tree)
+
+        private static int RunTech(ulong seed, int years, int daysPerSeason)
+        {
+            if (years < 4) years = 6; // the tree fills over a few years
+            WorldMap map = WorldGenerator.Generate(new WorldGenSettings { Width = 128, Height = 128 }, seed);
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 24,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.58f, WoodcutterShare = 0.25f, ScholarShare = 0.13f,
+                StartingFoodUnits = 320f, StartingFirewoodUnits = 260f,
+                EnableTechnology = true,
+                ResearchPerScholarPerDay = 1.5f
+            };
+            Settlement colony = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+
+            int scholars = 0; foreach (var cz in colony.Citizens) if (cz.Profession == Profession.Scholar) scholars++;
+
+            Console.WriteLine("Founder's Lands — technology & progression (GDD §16)");
+            Console.WriteLine($"seed={seed}  pop={colony.AlivePopulation}  scholars={scholars}  tech tree: {colony.Techs.Count} technologies");
+            Console.WriteLine("scholars accrue research; each tech unlocks buildings and lifts the work bonus.");
+            Console.WriteLine();
+            Console.WriteLine($"{"Year",4} {"Season",-7} {"Techs",6} {"Researching",-16} {"Progress",-10} {"Bonus",6} {"Pop",4} {"Health",7}");
+
+            int totalDays = years * daysPerSeason * 4;
+            int lastCount = -1;
+            for (int d = 0; d < totalDays; d++)
+            {
+                DayReport r = SettlementSimulation.Step(colony);
+                bool unlockedThisStep = colony.UnlockedTechs.Count != lastCount && lastCount >= 0;
+                lastCount = colony.UnlockedTechs.Count;
+
+                if ((r.Day % daysPerSeason) == (daysPerSeason - 1) || unlockedThisStep)
+                {
+                    Technology next = ResearchSystem.NextTarget(colony);
+                    string researching = next != null ? next.Name : "(complete)";
+                    string progress = next != null ? $"{colony.ResearchProgress:0}/{next.Cost:0}" : "—";
+                    Console.WriteLine($"{r.Year,4} {r.Season,-7} {colony.UnlockedTechs.Count + "/" + colony.Techs.Count,6} " +
+                                      $"{researching,-16} {progress,-10} {colony.TechWorkBonus * 100f,5:0}% {r.Population,4} {r.AvgHealth,7:0.0}");
+                }
+                if (colony.AlivePopulation == 0) { Console.WriteLine($"  -- wiped out day {r.Day} --"); break; }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"Researched {colony.UnlockedTechs.Count}/{colony.Techs.Count} technologies; " +
+                              $"work bonus +{colony.TechWorkBonus * 100f:0}%. Buildings unlocked: {colony.UnlockedBuildings.Count} beyond the founding set.");
+            return 0;
         }
 
         // ---------------------------------------------------------------- trade (caravans & contracts)

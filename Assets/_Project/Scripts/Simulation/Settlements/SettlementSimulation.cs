@@ -4,6 +4,7 @@ using FoundersLands.Simulation.Farming;
 using FoundersLands.Simulation.Mathematics;
 using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Production;
+using FoundersLands.Simulation.Technology;
 using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.Trade;
@@ -23,6 +24,7 @@ namespace FoundersLands.Simulation.Settlements
             SeasonDef season = s.Seasons[(int)s.Clock.Season];
 
             s.RecomputeBuildingEffects();
+            ResearchSystem.Step(s); // scholars may unlock a tech and raise the work bonus for today
             float efficiency = ComputeWorkEfficiency(s);
 
             Gather(s, season, efficiency);
@@ -152,7 +154,7 @@ namespace FoundersLands.Simulation.Settlements
             float marketBonus = (c.MarketProductivityBonus > 0f && HasCompleteMarket(s) && s.FoodUnits() > 0f)
                 ? c.MarketProductivityBonus : 0f;
 
-            return 1f + toolsBonus + marketBonus;
+            return 1f + toolsBonus + marketBonus + s.TechWorkBonus; // researched techs lift every craft (GDD §16)
         }
 
         private static void WearTools(Settlement s)

@@ -4,6 +4,7 @@ using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Production;
+using FoundersLands.Simulation.Technology;
 using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.Trade;
@@ -29,6 +30,7 @@ namespace FoundersLands.Simulation.Settlements
         public readonly ResourceCatalog Catalog;
         public readonly BuildingCatalog BuildingCatalog;
         public readonly RecipeCatalog Recipes;
+        public readonly TechCatalog Techs;
         public readonly SeasonDef[] Seasons;
         public readonly SettlementConfig Config;
 
@@ -71,9 +73,17 @@ namespace FoundersLands.Simulation.Settlements
         public readonly TradePolicy TradePolicy = new TradePolicy();
         public readonly TradeLedger TradeLedger = new TradeLedger();
 
+        // Technology (GDD §16); inert while Config.EnableTechnology is false. Research accrues toward
+        // the next tech; unlocked techs open buildings and add a work bonus.
+        public float ResearchProgress;
+        public float TechWorkBonus;
+        public string LastUnlockedTech;
+        public readonly HashSet<int> UnlockedTechs = new HashSet<int>();
+        public readonly HashSet<BuildingType> UnlockedBuildings = new HashSet<BuildingType>();
+
         public Settlement(WorldMap map, int centerX, int centerY, SettlementConfig config,
             ResourceCatalog catalog, SeasonDef[] seasons, BuildingCatalog buildingCatalog = null,
-            RecipeCatalog recipes = null)
+            RecipeCatalog recipes = null, TechCatalog techs = null)
         {
             Map = map;
             CenterX = centerX;
@@ -83,6 +93,7 @@ namespace FoundersLands.Simulation.Settlements
             Seasons = seasons;
             BuildingCatalog = buildingCatalog ?? BuildingCatalog.CreateDefault();
             Recipes = recipes ?? RecipeCatalog.CreateDefault();
+            Techs = techs ?? TechCatalog.CreateDefault();
             Storehouse = new Inventory(config.StorehouseCapacity);
             BaseStorageCapacity = config.StorehouseCapacity;
             Clock = new SimulationClock(config.DaysPerSeason);
@@ -144,12 +155,23 @@ namespace FoundersLands.Simulation.Settlements
             return sum;
         }
 
-        /// <summary>Place a blueprint to be built (GDD §10). Returns the new building.</summary>
+        /// <summary>
+        /// Place a blueprint to be built (GDD §10). Returns the new building, or null if its type is
+        /// still locked behind research (only possible when technology is enabled — see GDD §16).
+        /// </summary>
         public Building PlaceBlueprint(BuildingType type, int x, int y)
         {
+            if (!IsBuildingUnlocked(type)) return null;
             Building b = new Building(BuildingCatalog.Get(type), x, y);
             Buildings.Add(b);
             return b;
+        }
+
+        /// <summary>Whether a building type may be placed: always true unless technology gates it.</summary>
+        public bool IsBuildingUnlocked(BuildingType type)
+        {
+            if (!Config.EnableTechnology) return true;
+            return Techs.BaseBuildings.Contains(type) || UnlockedBuildings.Contains(type);
         }
 
         /// <summary>Refresh the aggregate effects of completed buildings.</summary>
@@ -191,6 +213,9 @@ namespace FoundersLands.Simulation.Settlements
             for (int i = 0; i < Buildings.Count; i++) h = Buildings[i].Hash(h);
             h = Threat.Hash(h);
             h = TradeLedger.Hash(h);
+            h = StableHash.Combine(h, (int)(ResearchProgress * 100f));
+            for (int i = 0; i < Techs.Count; i++)
+                h = StableHash.Combine(h, UnlockedTechs.Contains(i) ? i + 1 : 0); // tech tree state, in catalog order
             h = StableHash.Combine(h, (int)(BirthProgress * 1000f));
             h = StableHash.Combine(h, (int)(MigrationProgress * 1000f));
             h = StableHash.Combine(h, TotalBirths);

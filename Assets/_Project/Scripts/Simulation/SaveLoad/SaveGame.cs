@@ -60,6 +60,10 @@ namespace FoundersLands.Simulation.SaveLoad
               .Append(tl.Ambushes).Append(' ').Append(F(tl.TotalExported)).Append(' ').Append(F(tl.TotalImported)).Append(' ')
               .Append(F(tl.SilverEarned)).Append(' ').Append(F(tl.SilverSpent)).Append('\n');
 
+            sb.Append("TEC ").Append(F(s.ResearchProgress)).Append(' ').Append(s.UnlockedTechs.Count);
+            for (int i = 0; i < s.Techs.Count; i++) if (s.UnlockedTechs.Contains(i)) sb.Append(' ').Append(i);
+            sb.Append('\n');
+
             sb.Append("CIT ").Append(s.Citizens.Count).Append('\n');
             for (int i = 0; i < s.Citizens.Count; i++)
             {
@@ -115,6 +119,8 @@ namespace FoundersLands.Simulation.SaveLoad
             int nextId = 0, totalBirths = 0, totalImmigrants = 0, totalLeft = 0, naturalDeaths = 0;
             float silver = 0f, tradeExported = 0f, tradeImported = 0f, silverEarned = 0f, silverSpent = 0f;
             int caravanVisits = 0, ambushes = 0;
+            float researchProgress = 0f;
+            var unlockedTechIds = new List<int>();
 
             var citizens = new List<string[]>();
             var stacks = new List<string[]>();
@@ -156,6 +162,10 @@ namespace FoundersLands.Simulation.SaveLoad
                         silver = Flt(t[1]); caravanVisits = Int(t[2]); ambushes = Int(t[3]);
                         tradeExported = Flt(t[4]); tradeImported = Flt(t[5]); silverEarned = Flt(t[6]); silverSpent = Flt(t[7]);
                         break;
+                    case "TEC":
+                        researchProgress = Flt(t[1]);
+                        for (int j = 3; j < t.Length; j++) unlockedTechIds.Add(Int(t[j])); // t[2] = count
+                        break;
                     case "STO": capacity = Flt(t[1]); break;
                     case "C": citizens.Add(t); break;
                     case "S": stacks.Add(t); break;
@@ -187,6 +197,17 @@ namespace FoundersLands.Simulation.SaveLoad
             s.Threat.TotalThefts = thrThefts;
             s.Threat.TotalStolen = thrStolen;
             s.Threat.TotalCasualties = thrCasualties;
+
+            // Restore tech state before buildings load, so unlocked types pass the placement gate.
+            s.ResearchProgress = researchProgress;
+            for (int i = 0; i < unlockedTechIds.Count; i++)
+            {
+                int id = unlockedTechIds[i];
+                if (!s.UnlockedTechs.Add(id)) continue;
+                var tech = s.Techs.Get(id);
+                for (int u = 0; u < tech.Unlocks.Length; u++) s.UnlockedBuildings.Add(tech.Unlocks[u]);
+                s.TechWorkBonus += tech.WorkBonus;
+            }
 
             // Set the effective capacity before adding goods so a full storehouse is not
             // clamped on load (a built storehouse may have raised capacity above the base).

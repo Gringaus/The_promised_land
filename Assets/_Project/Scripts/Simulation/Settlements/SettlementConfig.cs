@@ -128,6 +128,12 @@ namespace FoundersLands.Simulation.Settlements
         public float CaravanCapacity = 250f;     // max units moved per visit (scaled by route safety)
         public float StartingSilver = 0f;
 
+        // Technology / research (Module 12, GDD §16). Off by default: with it off every building is
+        // available from the start, so the earlier modules' scenarios are unchanged.
+        public bool EnableTechnology = false;
+        public float ScholarShare = 0.0f;
+        public float ResearchPerScholarPerDay = 1.0f;
+
         // Health dynamics.
         public float StarveHealthLossPerDay = 16f;
         public float ColdHealthLossPerDay = 16f;

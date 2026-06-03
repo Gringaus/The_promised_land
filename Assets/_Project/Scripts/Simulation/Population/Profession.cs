@@ -15,6 +15,7 @@ namespace FoundersLands.Simulation.Population
         Miner = 6,       // добывает железную руду (IronOre)
         Craftsman = 7,   // работает в мастерских по рецептам (GDD §12)
         Militiaman = 8,  // ополчение/дружина — обороняет колонию (GDD §13)
-        Farmer = 9       // обрабатывает поля: сев, уход, жатва (GDD §9)
+        Farmer = 9,      // обрабатывает поля: сев, уход, жатва (GDD §9)
+        Scholar = 10     // двигает исследования (GDD §16)
     }
 }

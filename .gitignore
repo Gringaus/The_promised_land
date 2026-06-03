@@ -47,6 +47,9 @@ sysinfo.txt
 !SimHarness/**/*.sln
 !SimHarness/**/*.cs
 
+# Save files produced by the console "saveload" mode
+*.fls
+
 # ----------------------------------------------------------------------------
 # OS / misc
 # ----------------------------------------------------------------------------

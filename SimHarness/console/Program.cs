@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using FoundersLands.Simulation.Construction;
 using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
+using FoundersLands.Simulation.SaveLoad;
 using FoundersLands.Simulation.Settlements;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.World;
@@ -43,6 +45,7 @@ namespace FoundersLands.SimViewer
 
             if (mode == "survive") return RunSurvival(seed, years, pop, daysPerSeason);
             if (mode == "build") return RunBuild(seed, years, pop, daysPerSeason);
+            if (mode == "saveload") return RunSaveLoad(seed, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -118,22 +121,7 @@ namespace FoundersLands.SimViewer
             var settings = new WorldGenSettings { Width = 128, Height = 128 };
             WorldMap map = WorldGenerator.Generate(settings, seed);
 
-            var config = new SettlementConfig
-            {
-                StartingPopulation = pop,
-                DaysPerSeason = daysPerSeason,
-                ForagerShare = 0.50f,
-                WoodcutterShare = 0.20f,
-                LoggerShare = 0.12f,
-                QuarrymanShare = 0.06f,
-                BuilderShare = 0.12f,
-                // Bigger buffer: building diverts hands from food/fuel, so the colony must
-                // coast through the first lean spring on stored supplies (GDD §9, §10).
-                StartingFoodUnits = 300f,
-                StartingFirewoodUnits = 250f,
-                StartingWoodUnits = 80f,
-                StartingStoneUnits = 40f
-            };
+            SettlementConfig config = BuildScenarioConfig(pop, daysPerSeason);
             ResourceCatalog catalog = ResourceCatalog.CreateDefault();
             SeasonDef[] seasons = SeasonDef.CreateDefault();
             Settlement colony = SettlementFactory.Create(map, seed, config, catalog, seasons);
@@ -171,6 +159,66 @@ namespace FoundersLands.SimViewer
             Console.WriteLine($"Built {colony.BuildingsComplete}/{planned} buildings.  Housing for {colony.HousingCapacity} " +
                               $"(pop {colony.AlivePopulation}).  Storehouse capacity {colony.Storehouse.Capacity:0}.");
             return 0;
+        }
+
+        private static SettlementConfig BuildScenarioConfig(int pop, int daysPerSeason)
+        {
+            return new SettlementConfig
+            {
+                StartingPopulation = pop,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.50f,
+                WoodcutterShare = 0.20f,
+                LoggerShare = 0.12f,
+                QuarrymanShare = 0.06f,
+                BuilderShare = 0.12f,
+                // Bigger buffer: building diverts hands from food/fuel, so the colony must
+                // coast through the first lean spring on stored supplies (GDD §9, §10).
+                StartingFoodUnits = 300f,
+                StartingFirewoodUnits = 250f,
+                StartingWoodUnits = 80f,
+                StartingStoneUnits = 40f
+            };
+        }
+
+        // ---------------------------------------------------------------- save / load
+
+        private static int RunSaveLoad(ulong seed, int daysPerSeason)
+        {
+            var settings = new WorldGenSettings { Width = 128, Height = 128 };
+            WorldMap map = WorldGenerator.Generate(settings, seed);
+
+            SettlementConfig config = BuildScenarioConfig(28, daysPerSeason);
+            Settlement colony = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+            PlaceBuildPlan(colony);
+
+            // Play a year so the save captures a rich, mid-game state (buildings, stocks).
+            SettlementSimulation.Run(colony, colony.Clock.DaysPerYear);
+
+            string text = SaveGame.Save(colony, settings);
+            const string path = "founders_save.fls";
+            File.WriteAllText(path, text);
+
+            Settlement loaded = SaveGame.Load(File.ReadAllText(path));
+
+            Console.WriteLine("Founder's Lands — save / load round-trip (GDD §21)");
+            Console.WriteLine($"saved to {path}  ({text.Length} bytes)");
+            Console.WriteLine($"state: day={colony.Clock.Day}  pop={colony.AlivePopulation}  buildings={colony.BuildingsComplete}  food={colony.FoodUnits():0}");
+            Console.WriteLine();
+
+            bool mapMatch = colony.Map.ContentHash() == loaded.Map.ContentHash();
+            bool stateMatch = colony.StateHash() == loaded.StateHash();
+            Console.WriteLine($"map regenerated from seed:  {(mapMatch ? "MATCH" : "MISMATCH")}  (0x{loaded.Map.ContentHash():X16})");
+            Console.WriteLine($"settlement state restored:  {(stateMatch ? "MATCH" : "MISMATCH")}  (0x{loaded.StateHash():X16})");
+
+            // Continue both another year and confirm they stay in lock-step.
+            SettlementSimulation.Run(colony, colony.Clock.DaysPerYear);
+            SettlementSimulation.Run(loaded, loaded.Clock.DaysPerYear);
+            bool contMatch = colony.StateHash() == loaded.StateHash();
+            Console.WriteLine($"identical after replaying a year: {(contMatch ? "MATCH" : "MISMATCH")}");
+
+            return (mapMatch && stateMatch && contMatch) ? 0 : 1;
         }
 
         private static void PlaceBuildPlan(Settlement colony)

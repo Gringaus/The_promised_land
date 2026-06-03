@@ -1,5 +1,6 @@
 using FoundersLands.Simulation.Construction;
 using FoundersLands.Simulation.Economy;
+using FoundersLands.Simulation.Farming;
 using FoundersLands.Simulation.Mathematics;
 using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Production;
@@ -24,6 +25,7 @@ namespace FoundersLands.Simulation.Settlements
             float efficiency = ComputeWorkEfficiency(s);
 
             Gather(s, season, efficiency);
+            Farm(s, season, efficiency);
             Produce(s, season, efficiency);
             Construct(s, season, efficiency);
             WearTools(s);
@@ -108,6 +110,12 @@ namespace FoundersLands.Simulation.Settlements
             if (craftsmen == 0) return;
             float labor = craftsmen * s.Config.CraftsmanWorkPerDay * season.WorkSpeedMult * efficiency;
             ProductionSystem.Step(s.Buildings, s.Storehouse, s.Recipes, labor);
+        }
+
+        private static void Farm(Settlement s, SeasonDef season, float efficiency)
+        {
+            float labor = CountProfession(s, Profession.Farmer) * s.Config.FarmerWorkPerDay * season.WorkSpeedMult * efficiency;
+            FarmingSystem.Step(s.Buildings, s.Storehouse, s.Clock.Season, s.SoilFertility, labor, s.Config);
         }
 
         private static void Construct(Settlement s, SeasonDef season, float efficiency)

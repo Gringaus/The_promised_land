@@ -31,6 +31,12 @@ namespace FoundersLands.Simulation.Production
                 .In(ResourceType.IronOre, 2f));
             c.Add(new ProductionRecipe(BuildingType.Smithy, "Forge tools", ResourceType.Tools, 2f, 6f)
                 .In(ResourceType.IronIngot, 1f));
+
+            // Farming chain (Module 8, GDD §9): grain -> flour -> bread. Baking burns firewood.
+            c.Add(new ProductionRecipe(BuildingType.Mill, "Mill flour", ResourceType.Flour, 1f, 3f)
+                .In(ResourceType.Grain, 1f));
+            c.Add(new ProductionRecipe(BuildingType.Bakery, "Bake bread", ResourceType.Bread, 2f, 4f)
+                .In(ResourceType.Flour, 1f).In(ResourceType.Firewood, 1f));
             return c;
         }
     }

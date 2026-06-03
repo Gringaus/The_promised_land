@@ -81,7 +81,7 @@ namespace FoundersLands.Simulation.Economy
             var list = new List<ItemStack>();
             // Iterate types/qualities in fixed numeric order, not dictionary order.
             // NOTE: keep the upper bound at the last ResourceType value.
-            for (int t = 0; t <= (int)ResourceType.Tools; t++)
+            for (int t = 0; t <= (int)ResourceType.Bread; t++)
             {
                 for (int q = 0; q <= (int)ResourceQuality.Fine; q++)
                 {

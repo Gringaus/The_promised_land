@@ -48,6 +48,7 @@ namespace FoundersLands.Simulation.Settlements
                 FirewoodFactor = Factor(wood, config.FirewoodPotentialForFull, config.MinFirewoodFactor),
                 StoneFactor = Factor(stone, config.StonePotentialForFull, config.MinStoneFactor),
                 IronFactor = Factor(iron, config.IronPotentialForFull, config.MinIronFactor),
+                SoilFertility = avgFertility,
                 Rng = DeterministicRng.Stream(seed, StreamSettlement)
             };
 
@@ -209,6 +210,7 @@ namespace FoundersLands.Simulation.Settlements
             int miners = (int)System.Math.Round(pop * config.MinerShare);
             int craftsmen = (int)System.Math.Round(pop * config.CraftsmanShare);
             int militia = (int)System.Math.Round(pop * config.MilitiaShare);
+            int farmers = (int)System.Math.Round(pop * config.FarmerShare);
 
             // Cumulative thresholds; any remainder becomes idle.
             int tF = foragers;
@@ -219,6 +221,7 @@ namespace FoundersLands.Simulation.Settlements
             int tM = tB + miners;
             int tC = tM + craftsmen;
             int tMil = tC + militia;
+            int tFarm = tMil + farmers;
 
             for (int i = 0; i < pop; i++)
             {
@@ -230,6 +233,7 @@ namespace FoundersLands.Simulation.Settlements
                                 : i < tM ? Profession.Miner
                                 : i < tC ? Profession.Craftsman
                                 : i < tMil ? Profession.Militiaman
+                                : i < tFarm ? Profession.Farmer
                                 : Profession.Idle;
 
                 string name = Names[s.Rng.NextInt(0, Names.Length)];

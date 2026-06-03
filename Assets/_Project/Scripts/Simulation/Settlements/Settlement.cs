@@ -37,6 +37,7 @@ namespace FoundersLands.Simulation.Settlements
         public float FirewoodFactor;
         public float StoneFactor;
         public float IronFactor;
+        public float SoilFertility; // avg fertility around the site, drives field yield (GDD §9)
         public ResourceType PrimaryFood;
         public ResourceQuality ForageQuality;
 

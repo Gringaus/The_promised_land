@@ -19,6 +19,7 @@ namespace FoundersLands.Simulation.Settlements
         public float MinerShare = 0.0f;
         public float CraftsmanShare = 0.0f;
         public float MilitiaShare = 0.0f;
+        public float FarmerShare = 0.0f;
 
         public float StorehouseCapacity = 6000f;
 
@@ -41,6 +42,13 @@ namespace FoundersLands.Simulation.Settlements
         public float BuilderWorkPerDay = 8.0f;    // единиц работы на стройке (GDD §10)
         public float MinerIronPerDay = 3.0f;      // железная руда
         public float CraftsmanWorkPerDay = 8.0f;  // единиц работы в мастерских (GDD §12)
+        public float FarmerWorkPerDay = 8.0f;     // единиц труда на полях (GDD §9)
+
+        // Farming (Module 8, GDD §9). With no fields/farmers these are inert.
+        public float FarmGrowthPerDay = 0.03f;       // crop maturity gained per tended day
+        public float FarmTendLaborPerField = 8.0f;   // farmer labour to fully tend one field
+        public float FarmMinGrowthFraction = 0.3f;   // growth an untended field still manages
+        public float FieldBaseYield = 110f;          // grain from one fully-grown field at avg soil
 
         // How map richness near the settlement gates output.
         public float GatherRadius = 24f;

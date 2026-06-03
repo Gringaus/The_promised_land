@@ -55,6 +55,7 @@ namespace FoundersLands.SimViewer
             if (mode == "logistics") return RunLogistics(seed);
             if (mode == "production") return RunProduction(seed, years, daysPerSeason);
             if (mode == "raiders") return RunRaiders(seed, years, daysPerSeason);
+            if (mode == "farming") return RunFarming(seed, years, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -328,6 +329,59 @@ namespace FoundersLands.SimViewer
             Building b = colony.PlaceBlueprint(type, x, y);
             b.WorkDone = b.WorkRequired;
             b.Complete = true;
+        }
+
+        // ---------------------------------------------------------------- farming (seasonal fields)
+
+        private static int RunFarming(ulong seed, int years, int daysPerSeason)
+        {
+            WorldMap map = WorldGenerator.Generate(new WorldGenSettings { Width = 128, Height = 128 }, seed);
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 40,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.25f, WoodcutterShare = 0.20f, FarmerShare = 0.33f, CraftsmanShare = 0.14f,
+                StorehouseCapacity = 20000f,
+                // A new colony must bridge its first spring and summer on stores until the first
+                // autumn harvest — only then does home-grown bread carry it through winter.
+                StartingFoodUnits = 2000f, StartingFirewoodUnits = 450f,
+                StartingWoodUnits = 40f, StartingStoneUnits = 20f
+            };
+            Settlement colony = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+
+            int gx = colony.CenterX, gy = colony.CenterY;
+            PlaceComplete(colony, BuildingType.Storehouse, gx + 1, gy);
+            for (int i = 0; i < 8; i++) PlaceComplete(colony, BuildingType.House, gx + 2 + i, gy);
+            PlaceComplete(colony, BuildingType.Mill, gx, gy + 1);
+            PlaceComplete(colony, BuildingType.Bakery, gx, gy + 2);
+            for (int i = 0; i < 10; i++) PlaceComplete(colony, BuildingType.Field, gx - 1 - i, gy + 4);
+
+            int farmers = 0; foreach (var cz in colony.Citizens) if (cz.Profession == Profession.Farmer) farmers++;
+
+            Console.WriteLine("Founder's Lands — seasonal farming (GDD §9)");
+            Console.WriteLine($"seed={seed}  pop={colony.AlivePopulation}  farmers={farmers}  fields=10  soilFertility={colony.SoilFertility:0.00}");
+            Console.WriteLine("cycle: sow in spring, ripen through summer, reap grain in autumn; mill -> flour -> bread (bakery burns firewood)");
+            Console.WriteLine();
+            Console.WriteLine($"{"Year",4} {"Season",-7} {"Pop",4} {"Grain",6} {"Flour",6} {"Bread",6} {"Food",6} {"Firewd",7} {"Health",7}");
+
+            int totalDays = years * daysPerSeason * 4;
+            for (int d = 0; d < totalDays; d++)
+            {
+                DayReport r = SettlementSimulation.Step(colony);
+                if ((r.Day % daysPerSeason) == (daysPerSeason - 1))
+                {
+                    Console.WriteLine($"{r.Year,4} {r.Season,-7} {r.Population,4} " +
+                                      $"{colony.Storehouse.Count(ResourceType.Grain),6:0} {colony.Storehouse.Count(ResourceType.Flour),6:0} " +
+                                      $"{colony.Storehouse.Count(ResourceType.Bread),6:0} {r.FoodUnits,6:0} {r.FirewoodUnits,7:0} {r.AvgHealth,7:0.0}");
+                }
+                if (colony.AlivePopulation == 0) { Console.WriteLine($"  -- wiped out day {r.Day} --"); break; }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"Survivors {colony.AlivePopulation}/40, total deaths {colony.TotalDeaths}. " +
+                              $"A year's bread baked from home-grown grain feeds the colony through winter.");
+            return 0;
         }
 
         // ---------------------------------------------------------------- raiders (AI Director)

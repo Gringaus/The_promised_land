@@ -49,6 +49,12 @@ namespace FoundersLands.Simulation.Economy
             c.Add(new ResourceDef(ResourceType.Fish, "Fish") { Nutrition = 1.0f, Perishable = true, DailySpoilFraction = 0.030f });
             c.Add(new ResourceDef(ResourceType.Meat, "Meat") { Nutrition = 1.5f, Perishable = true, DailySpoilFraction = 0.015f });
 
+            // Farmed food (Module 8, GDD §9). Grain keeps through winter; milling and baking
+            // turn it into bread, far more nourishing per unit than raw grain.
+            c.Add(new ResourceDef(ResourceType.Grain, "Grain") { Nutrition = 0.5f, Perishable = true, DailySpoilFraction = 0.003f });
+            c.Add(new ResourceDef(ResourceType.Flour, "Flour")); // intermediate, not eaten directly
+            c.Add(new ResourceDef(ResourceType.Bread, "Bread") { Nutrition = 1.8f, Perishable = true, DailySpoilFraction = 0.010f });
+
             return c;
         }
     }

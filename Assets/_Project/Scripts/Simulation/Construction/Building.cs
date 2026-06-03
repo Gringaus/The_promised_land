@@ -19,6 +19,10 @@ namespace FoundersLands.Simulation.Construction
         public float WorkDone;
         public bool Complete;
 
+        // Crop state for a Field (GDD §9); unused (0/false) by every other building type.
+        public bool Planted;
+        public float CropGrowth; // 0..1, set by tending through spring and summer
+
         private readonly List<MaterialCost> _cost;
         private readonly Dictionary<ResourceType, float> _delivered = new Dictionary<ResourceType, float>();
 
@@ -95,6 +99,8 @@ namespace FoundersLands.Simulation.Construction
             h = StableHash.Combine(h, Y);
             h = StableHash.Combine(h, (int)(WorkDone * 100f));
             h = StableHash.Combine(h, Complete ? 1 : 0);
+            h = StableHash.Combine(h, Planted ? 1 : 0);
+            h = StableHash.Combine(h, (int)(CropGrowth * 1000f));
             for (int i = 0; i < _cost.Count; i++)
             {
                 h = StableHash.Combine(h, (int)(Delivered(_cost[i].Type) * 100f));

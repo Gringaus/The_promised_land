@@ -79,6 +79,7 @@ namespace FoundersLands.Simulation.SaveLoad
                 {
                     sb.Append(' ').Append((int)cost[j].Type).Append(' ').Append(F(b.Delivered(cost[j].Type)));
                 }
+                sb.Append(' ').Append(b.Planted ? 1 : 0).Append(' ').Append(F(b.CropGrowth)); // field crop state
                 sb.Append('\n');
             }
 
@@ -200,6 +201,12 @@ namespace FoundersLands.Simulation.SaveLoad
                     ResourceType rt = (ResourceType)Int(t[7 + j * 2]);
                     float amt = Flt(t[8 + j * 2]);
                     if (amt > 0f) b.Deliver(rt, amt);
+                }
+                int cropIdx = 7 + nCost * 2;
+                if (t.Length > cropIdx + 1)
+                {
+                    b.Planted = t[cropIdx] == "1";
+                    b.CropGrowth = Flt(t[cropIdx + 1]);
                 }
             }
 

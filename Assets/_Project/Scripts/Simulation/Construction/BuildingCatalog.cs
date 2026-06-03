@@ -72,6 +72,20 @@ namespace FoundersLands.Simulation.Construction
                 { WorkRequired = 40f, DefenseBonus = 3f }
                 .Needs(ResourceType.Wood, 24f));
 
+            // Farming (Module 8, GDD §9). A field is cheap to clear; the mill and bakery are
+            // workshops driven by RecipeCatalog, turning grain into flour and then bread.
+            c.Add(new BuildingDef(BuildingType.Field, "Field")
+                { WorkRequired = 30f }
+                .Needs(ResourceType.Wood, 6f));
+
+            c.Add(new BuildingDef(BuildingType.Mill, "Mill")
+                { WorkRequired = 70f }
+                .Needs(ResourceType.Wood, 22f).Needs(ResourceType.Stone, 10f));
+
+            c.Add(new BuildingDef(BuildingType.Bakery, "Bakery")
+                { WorkRequired = 60f }
+                .Needs(ResourceType.Wood, 16f).Needs(ResourceType.Stone, 14f));
+
             return c;
         }
     }

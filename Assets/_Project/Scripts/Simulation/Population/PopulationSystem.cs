@@ -110,6 +110,41 @@ namespace FoundersLands.Simulation.Population
             // Nobody idle to lose: the colony holds together.
         }
 
+        /// <summary>
+        /// Reassign every working-age settler to a profession matching the current configured shares,
+        /// in citizen order, with any remainder left Idle. Lets a player re-task the whole workforce at
+        /// once (e.g. from the playable console) rather than waiting for new adults to drift into roles.
+        /// Children keep their (Idle) status. Deterministic; does not touch the RNG.
+        /// </summary>
+        public static void ReassignWorkforce(Settlement s)
+        {
+            SettlementConfig c = s.Config;
+            int workers = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+            {
+                Citizen z = s.Citizens[i];
+                if (z.Alive && z.Age >= c.WorkingAge) workers++;
+            }
+
+            int[] want = new int[(int)Profession.Scholar + 1];
+            for (int p = (int)Profession.Forager; p <= (int)Profession.Scholar; p++)
+            {
+                float share = ShareOf(c, (Profession)p);
+                want[p] = share > 0f ? (int)System.Math.Round(workers * share) : 0;
+            }
+
+            int curProf = (int)Profession.Forager, filled = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+            {
+                Citizen z = s.Citizens[i];
+                if (!z.Alive || z.Age < c.WorkingAge) continue;
+                while (curProf <= (int)Profession.Scholar && filled >= want[curProf]) { curProf++; filled = 0; }
+                if (curProf > (int)Profession.Scholar) { z.Profession = Profession.Idle; continue; }
+                z.Profession = (Profession)curProf;
+                filled++;
+            }
+        }
+
         // New adults fill whichever profession is furthest below its configured share, keeping the
         // workforce mix balanced as the colony grows.
         private static Profession PickProfession(Settlement s, SettlementConfig c)

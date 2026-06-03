@@ -1,6 +1,7 @@
 using FoundersLands.Simulation.Construction;
 using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
+using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.SaveLoad;
 using FoundersLands.Simulation.Settlements;
 using FoundersLands.Simulation.Time;
@@ -118,6 +119,78 @@ namespace FoundersLands.Simulation.Tests
             Assert.Equal(s.TotalImmigrants, loaded.TotalImmigrants);
             Assert.Equal(s.NextCitizenId, loaded.NextCitizenId);
             Assert.Equal(s.AlivePopulation, loaded.AlivePopulation);
+        }
+
+        // ---- ReassignWorkforce: re-task the whole workforce on demand (used by the playable build) ----
+
+        [Fact]
+        public void ReassignWorkforce_RetasksByShares()
+        {
+            Settlement s = Colony(dynamics: true); // 16 working-age adults, all forager/woodcutter at first
+            ZeroShares(s.Config);
+            s.Config.ForagerShare = 0.5f; s.Config.WoodcutterShare = 0.25f; s.Config.BuilderShare = 0.25f;
+
+            PopulationSystem.ReassignWorkforce(s);
+
+            int workers = WorkingAdults(s);
+            Assert.Equal((int)System.Math.Round(workers * 0.5f), Count(s, Profession.Forager));
+            Assert.Equal((int)System.Math.Round(workers * 0.25f), Count(s, Profession.Woodcutter));
+            Assert.Equal((int)System.Math.Round(workers * 0.25f), Count(s, Profession.Builder));
+            Assert.Equal(0, Count(s, Profession.Logger)); // a zero share gets nobody
+        }
+
+        [Fact]
+        public void ReassignWorkforce_LeavesRemainderIdle()
+        {
+            Settlement s = Colony(dynamics: true);
+            ZeroShares(s.Config);
+            s.Config.ForagerShare = 0.5f; // only half the workforce has a job to do
+
+            PopulationSystem.ReassignWorkforce(s);
+
+            int workers = WorkingAdults(s);
+            int foragers = (int)System.Math.Round(workers * 0.5f);
+            Assert.Equal(foragers, Count(s, Profession.Forager));
+            Assert.Equal(workers - foragers, Count(s, Profession.Idle)); // the rest stand idle
+        }
+
+        [Fact]
+        public void ReassignWorkforce_DoesNotPutChildrenToWork()
+        {
+            Settlement s = Colony(dynamics: true);
+            SettlementSimulation.Run(s, s.Clock.DaysPerYear * 4); // raise a generation of children
+            int children = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+                if (s.Citizens[i].Alive && s.Citizens[i].Age < s.Config.WorkingAge) children++;
+            Assert.True(children > 0, "the colony should have borne children to test against");
+
+            PopulationSystem.ReassignWorkforce(s);
+
+            for (int i = 0; i < s.Citizens.Count; i++)
+                if (s.Citizens[i].Alive && s.Citizens[i].Age < s.Config.WorkingAge)
+                    Assert.Equal(Profession.Idle, s.Citizens[i].Profession);
+        }
+
+        private static void ZeroShares(SettlementConfig c)
+        {
+            c.ForagerShare = c.WoodcutterShare = c.LoggerShare = c.QuarrymanShare = c.BuilderShare =
+                c.MinerShare = c.CraftsmanShare = c.MilitiaShare = c.FarmerShare = c.ScholarShare = 0f;
+        }
+
+        private static int WorkingAdults(Settlement s)
+        {
+            int n = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+                if (s.Citizens[i].Alive && s.Citizens[i].Age >= s.Config.WorkingAge) n++;
+            return n;
+        }
+
+        private static int Count(Settlement s, Profession p)
+        {
+            int n = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+                if (s.Citizens[i].Alive && s.Citizens[i].Profession == p) n++;
+            return n;
         }
     }
 }

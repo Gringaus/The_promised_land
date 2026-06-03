@@ -36,6 +36,7 @@ namespace FoundersLands.SimViewer
             ulong seed = StableHash.Fnv1a64("green-valley");
             int width = 96, height = 48;
             int years = 3, pop = 20, daysPerSeason = 24;
+            string? commands = null;
 
             for (int i = 0; i + 1 < args.Length; i++)
             {
@@ -48,6 +49,7 @@ namespace FoundersLands.SimViewer
                     case "--years": int.TryParse(args[i + 1], out years); break;
                     case "--pop": int.TryParse(args[i + 1], out pop); break;
                     case "--daysPerSeason": int.TryParse(args[i + 1], out daysPerSeason); break;
+                    case "--commands": commands = args[i + 1]; break;
                 }
             }
 
@@ -63,6 +65,7 @@ namespace FoundersLands.SimViewer
             if (mode == "tech") return RunTech(seed, years, daysPerSeason);
             if (mode == "grand") return RunGrand(seed, years, daysPerSeason);
             if (mode == "preserve") return RunPreserve(seed, years, daysPerSeason);
+            if (mode == "play") return RunPlay(seed, daysPerSeason, commands);
             return RunMapPreview(seed, width, height);
         }
 
@@ -336,6 +339,380 @@ namespace FoundersLands.SimViewer
             Building b = colony.PlaceBlueprint(type, x, y);
             b.WorkDone = b.WorkRequired;
             b.Complete = true;
+        }
+
+        // ================================================================ PLAYABLE COLONY (§28)
+        // A first playable build of the colony: a real-time loop you steer with simple commands.
+        // Works two ways — live single-key control in a real terminal, or a deterministic command
+        // script (piped stdin or --commands "...") for reproducible runs, demos and testing.
+
+        private const int PlayWinPopulation = 30;
+        private const int PlayEndureYears = 30;
+
+        private static int RunPlay(ulong seed, int daysPerSeason, string? commands)
+        {
+            Settlement s = CreatePlayColony(seed, daysPerSeason, out WorldGenSettings settings);
+
+            // Input source: explicit --commands, else piped stdin (scripted), else live keyboard.
+            List<string>? script = null;
+            if (!string.IsNullOrEmpty(commands)) script = SplitCommands(commands);
+            else if (Console.IsInputRedirected) script = ReadStdinCommands();
+
+            Console.WriteLine("=== FOUNDER'S LANDS — playable colony (GDD §28) ===");
+            Console.WriteLine($"seed={seed}.  Lead your settlers through the seasons: keep them fed and warm,");
+            Console.WriteLine($"raise buildings, balance the workforce, and grow the colony to {PlayWinPopulation}.");
+            Console.WriteLine(PlayHelp());
+
+            float speed = 3f; bool running = true; string msg = "A new colony takes root by the river.";
+
+            if (script != null)
+            {
+                RenderDashboard(s, speed, running, msg, false);
+                foreach (string raw in script)
+                {
+                    string line = (raw ?? string.Empty).Trim();
+                    if (line.Length == 0 || line[0] == '#') continue;
+                    Console.WriteLine();
+                    Console.WriteLine($"> {line}");
+                    bool keepGoing = HandleCommand(ref s, settings, line, ref speed, ref running, ref msg);
+                    RenderDashboard(s, speed, running, msg, false);
+                    string? outcome = PlayOutcome(s);
+                    if (outcome != null) { Console.WriteLine(); Console.WriteLine(outcome); return 0; }
+                    if (!keepGoing) { Console.WriteLine(); Console.WriteLine("You step back; the colony carries on without you."); return 0; }
+                }
+                Console.WriteLine();
+                Console.WriteLine("(end of script — the colony stands paused, awaiting your next command)");
+                return 0;
+            }
+
+            // Live terminal: time flows in real time; keys steer it.
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            double accumDays = 0;
+            while (true)
+            {
+                RenderDashboard(s, speed, running, msg, true);
+
+                double frameStart = clock.Elapsed.TotalSeconds;
+                while (clock.Elapsed.TotalSeconds - frameStart < 0.12)
+                {
+                    if (TryReadKeyCommand(out string keyLine))
+                    {
+                        if (keyLine == "\0pause") { running = !running; msg = running ? "Resumed." : "Paused."; }
+                        else if (!HandleCommand(ref s, settings, keyLine, ref speed, ref running, ref msg))
+                        { Console.WriteLine(); Console.WriteLine("Farewell, founder."); return 0; }
+                    }
+                    System.Threading.Thread.Sleep(15);
+                }
+
+                if (running)
+                {
+                    accumDays += speed * (clock.Elapsed.TotalSeconds - frameStart);
+                    int steps = (int)accumDays;
+                    if (steps > 0) { accumDays -= steps; msg = AdvanceDays(s, steps); }
+                }
+
+                string? outcome = PlayOutcome(s);
+                if (outcome != null) { RenderDashboard(s, speed, running, msg, true); Console.WriteLine(); Console.WriteLine(outcome); return 0; }
+            }
+        }
+
+        private static Settlement CreatePlayColony(ulong seed, int daysPerSeason, out WorldGenSettings settings)
+        {
+            settings = new WorldGenSettings { Width = 128, Height = 128 };
+            WorldMap map = WorldGenerator.Generate(settings, seed);
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 16,
+                DaysPerSeason = daysPerSeason,
+                EnablePopulationDynamics = true,
+                EnableThreats = false, // a peaceful first build: survive the seasons, build, and grow
+                EnableTrade = true,
+                // Food-and-warmth-first mix (close to the proven Module 2 survival ratio) so the colony
+                // holds together on its own; the player retasks labour to loggers/quarrymen/builders
+                // when they want to raise something, trading a little food security for progress.
+                ForagerShare = 0.60f, WoodcutterShare = 0.30f, LoggerShare = 0.05f,
+                QuarrymanShare = 0.03f, BuilderShare = 0.02f,
+                StartingFoodUnits = 350f, StartingFirewoodUnits = 400f,
+                StartingWoodUnits = 140f, StartingStoneUnits = 90f,
+                // Forgiving yields for a first colony: a fed, warm, housed town grows steadily instead of
+                // merely holding on. Generous on BOTH food (so it grows — growth keys off forager
+                // capacity) and firewood (so a growing town still survives winter rather than freezing).
+                ForagerNutritionPerDay = 8.0f,
+                WoodcutterFirewoodPerDay = 9.0f,
+                // A gentler raid curve than the headless threat demo: a first colony gets years to
+                // raise a watchtower and a militia before bandits become a real danger (GDD §13).
+                ThreatBaseGrowth = 0.12f
+            };
+            Settlement s = SettlementFactory.Create(map, seed, config, ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+
+            // The founders arrive to a small established camp, not bare ground: room to live, somewhere
+            // to store the harvest, and two forager huts feeding a food surplus to grow on.
+            int cx = s.CenterX, cy = s.CenterY;
+            PlaceComplete(s, BuildingType.House, cx - 1, cy);
+            PlaceComplete(s, BuildingType.House, cx + 1, cy);
+            PlaceComplete(s, BuildingType.House, cx, cy - 1);
+            PlaceComplete(s, BuildingType.House, cx - 2, cy);
+            PlaceComplete(s, BuildingType.House, cx + 2, cy);
+            PlaceComplete(s, BuildingType.Storehouse, cx, cy + 1);
+            PlaceComplete(s, BuildingType.ForagerHut, cx - 1, cy - 1);
+            PlaceComplete(s, BuildingType.ForagerHut, cx + 1, cy + 1);
+            s.RecomputeBuildingEffects();
+            return s;
+        }
+
+        private static string PlayHelp() =>
+            "Commands: step [n] · season · year · build <type> [x y] · labor <job> <0..1> · speed <n> · save · load · status · help · quit\n" +
+            "  buildings: house storehouse forager woodcutter sawmill smelter smithy market watchtower palisade field mill bakery cellar smokehouse tent\n" +
+            "  jobs: forager woodcutter logger quarryman builder miner craftsman militia farmer scholar";
+
+        // Advance the simulation a number of days, returning a short summary of what happened.
+        private static string AdvanceDays(Settlement s, int days)
+        {
+            if (s.AlivePopulation == 0) return "The colony is gone.";
+            int b0 = s.TotalBirths, d0 = s.TotalDeaths, n0 = s.NaturalDeaths, l0 = s.TotalLeft, im0 = s.TotalImmigrants, r0 = s.Threat.TotalRaids;
+            float stolen0 = s.Threat.TotalStolen;
+
+            int done = 0;
+            for (int i = 0; i < days; i++) { if (s.AlivePopulation == 0) break; SettlementSimulation.Step(s); done++; }
+
+            var sb = new StringBuilder($"+{done}d: ");
+            int before = sb.Length;
+            AppendCount(sb, "born", s.TotalBirths - b0);
+            AppendCount(sb, "arrived", s.TotalImmigrants - im0);
+            AppendCount(sb, "starved/froze", s.TotalDeaths - d0);
+            AppendCount(sb, "old age", s.NaturalDeaths - n0);
+            AppendCount(sb, "left", s.TotalLeft - l0);
+            int raids = s.Threat.TotalRaids - r0;
+            if (raids > 0) sb.Append($"{raids} raid(s) (−{s.Threat.TotalStolen - stolen0:0} stolen); ");
+            if (sb.Length == before) sb.Append("a quiet stretch.");
+            return sb.ToString();
+        }
+
+        private static void AppendCount(StringBuilder sb, string label, int n)
+        {
+            if (n > 0) sb.Append($"{n} {label}; ");
+        }
+
+        private static bool HandleCommand(ref Settlement s, WorldGenSettings settings, string line,
+                                          ref float speed, ref bool running, ref string msg)
+        {
+            string[] t = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (t.Length == 0) return true;
+            switch (t[0].ToLowerInvariant())
+            {
+                case "quit": case "q": case "exit": return false;
+                case "help": case "h": case "?": msg = PlayHelp(); return true;
+                case "status": case "": msg = "—"; return true;
+                case "pause": running = false; msg = "Paused."; return true;
+                case "resume": case "go": running = true; msg = "Resumed."; return true;
+                case "speed":
+                    if (t.Length > 1 && TryF(t[1], out float sp)) { speed = sp < 0f ? 0f : (sp > 64f ? 64f : sp); msg = $"Speed set to {speed:0.#} days/s."; }
+                    else msg = "Usage: speed <days per second>";
+                    return true;
+                case "step": { int n = 1; if (t.Length > 1) int.TryParse(t[1], out n); msg = AdvanceDays(s, n < 1 ? 1 : n); return true; }
+                case "season": msg = AdvanceDays(s, s.Clock.DaysPerSeason); return true;
+                case "year": msg = AdvanceDays(s, s.Clock.DaysPerYear); return true;
+                case "labor": case "jobs": msg = DoLabor(s, t); return true;
+                case "build": msg = DoBuild(s, t); return true;
+                case "save": msg = DoSave(s, settings, t); return true;
+                case "load": { Settlement? loaded = DoLoad(t, out string r); if (loaded != null) s = loaded; msg = r; return true; }
+                default: msg = $"Unknown command '{t[0]}'. Type 'help'."; return true;
+            }
+        }
+
+        private static string DoLabor(Settlement s, string[] t)
+        {
+            if (t.Length < 3 || !TryF(t[2], out float share))
+                return "Usage: labor <job> <0..1>   e.g. labor builder 0.25";
+            share = share < 0f ? 0f : (share > 1f ? 1f : share);
+            SettlementConfig c = s.Config;
+            switch (t[1].ToLowerInvariant())
+            {
+                case "forager": c.ForagerShare = share; break;
+                case "woodcutter": c.WoodcutterShare = share; break;
+                case "logger": c.LoggerShare = share; break;
+                case "quarryman": c.QuarrymanShare = share; break;
+                case "builder": c.BuilderShare = share; break;
+                case "miner": c.MinerShare = share; break;
+                case "craftsman": c.CraftsmanShare = share; break;
+                case "militia": case "militiaman": c.MilitiaShare = share; break;
+                case "farmer": c.FarmerShare = share; break;
+                case "scholar": c.ScholarShare = share; break;
+                default: return $"Unknown job '{t[1]}'.";
+            }
+            PopulationSystem.ReassignWorkforce(s);
+            return $"{t[1].ToLowerInvariant()} share set to {share:0.00}; workforce re-tasked.";
+        }
+
+        private static string DoBuild(Settlement s, string[] t)
+        {
+            if (t.Length < 2 || !TryParseBuildingType(t[1], out BuildingType type))
+                return "Usage: build <type> [x y]   (try 'help' for the list)";
+            if (!s.IsBuildingUnlocked(type)) return $"{s.BuildingCatalog.Get(type).Name} is not researched yet.";
+
+            int x, y;
+            if (t.Length >= 4 && int.TryParse(t[2], out x) && int.TryParse(t[3], out y))
+            {
+                if (!s.Map.InBounds(x, y)) return "That spot is off the map.";
+                if (OccupiedAt(s, x, y)) return "That tile is already taken.";
+            }
+            else if (!FindBuildTile(s, out x, out y)) return "No free building spot near the centre.";
+
+            Building b = s.PlaceBlueprint(type, x, y);
+            if (b == null) return $"Cannot place {type} there.";
+            BuildingDef def = s.BuildingCatalog.Get(type);
+            return $"Blueprint placed: {def.Name} at ({x},{y}). Builders will raise it as materials arrive.";
+        }
+
+        private static string DoSave(Settlement s, WorldGenSettings settings, string[] t)
+        {
+            string path = t.Length > 1 ? t[1] : "founderslands-save.json";
+            try { File.WriteAllText(path, SaveGame.Save(s, settings)); return $"Saved to {path}."; }
+            catch (Exception e) { return $"Save failed: {e.Message}"; }
+        }
+
+        private static Settlement? DoLoad(string[] t, out string msg)
+        {
+            string path = t.Length > 1 ? t[1] : "founderslands-save.json";
+            try
+            {
+                if (!File.Exists(path)) { msg = $"No save at {path}."; return null; }
+                Settlement loaded = SaveGame.Load(File.ReadAllText(path));
+                msg = $"Loaded {path} — {loaded.AlivePopulation} settlers, year {loaded.Clock.Year}.";
+                return loaded;
+            }
+            catch (Exception e) { msg = $"Load failed: {e.Message}"; return null; }
+        }
+
+        private static string? PlayOutcome(Settlement s)
+        {
+            if (s.AlivePopulation == 0)
+                return "DEFEAT — the last settler is gone. The land reclaims the clearing. (try again with a steadier hand on food and firewood)";
+            if (s.AlivePopulation >= PlayWinPopulation)
+                return $"VICTORY — the colony has grown to {s.AlivePopulation} in year {s.Clock.Year}. Word spreads of a town that endures.";
+            if (s.Clock.Year >= PlayEndureYears)
+                return $"The chronicle closes after {PlayEndureYears} years with {s.AlivePopulation} settlers — a colony that endured.";
+            return null;
+        }
+
+        private static void RenderDashboard(Settlement s, float speed, bool running, string msg, bool live)
+        {
+            if (live) { try { Console.Clear(); } catch { /* no console buffer */ } }
+            var clk = s.Clock;
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine($"--- {clk.Season,-6} day {clk.DayOfSeason + 1,2}/{clk.DaysPerSeason} · year {clk.Year}    {(running ? $"RUN {speed:0.#}/s" : "PAUSED")} ---");
+            sb.AppendLine($"  People {s.AlivePopulation,3}   health {s.AverageHealth,5:0.0}   housing {s.HousingCapacity,3}   (goal {PlayWinPopulation})");
+
+            float pop = s.AlivePopulation < 1 ? 1 : s.AlivePopulation;
+            float foodDays = s.StoredNutrition() / (pop * s.Config.NutritionPerPersonPerDay);
+            sb.AppendLine($"  Food {s.FoodUnits(),6:0}  (~{foodDays,4:0}d)   Firewood {s.Storehouse.Count(ResourceType.Firewood),6:0}");
+            sb.AppendLine($"  Wood {s.Storehouse.Count(ResourceType.Wood),5:0}  Stone {s.Storehouse.Count(ResourceType.Stone),5:0}  " +
+                          $"Planks {s.Storehouse.Count(ResourceType.Planks),4:0}  Tools {s.Storehouse.Count(ResourceType.Tools),4:0}  " +
+                          $"Bread {s.Storehouse.Count(ResourceType.Bread),4:0}");
+            sb.AppendLine($"  Buildings {s.BuildingsComplete} done, {s.BuildingsUnderConstruction} rising" +
+                          $"{(s.SpoilageReductionFactor > 0f ? $"   spoilage -{s.SpoilageReductionFactor * 100f:0}%" : "")}" +
+                          $"{(s.Config.EnableTrade ? $"   silver {s.TradeLedger.Silver:0}" : "")}");
+            if (s.Config.EnableThreats)
+                sb.AppendLine($"  Threat {s.Threat.Stage} (pressure {s.Threat.Pressure:0})   raids survived {s.Threat.TotalRaids}");
+            sb.AppendLine($"  Labor  {LaborSummary(s)}");
+            sb.AppendLine($"  > {msg}");
+            Console.Write(sb.ToString());
+        }
+
+        private static string LaborSummary(Settlement s)
+        {
+            var sb = new StringBuilder();
+            AppendJob(sb, s, "for", Profession.Forager);
+            AppendJob(sb, s, "wood", Profession.Woodcutter);
+            AppendJob(sb, s, "log", Profession.Logger);
+            AppendJob(sb, s, "quarry", Profession.Quarryman);
+            AppendJob(sb, s, "build", Profession.Builder);
+            AppendJob(sb, s, "craft", Profession.Craftsman);
+            AppendJob(sb, s, "farm", Profession.Farmer);
+            AppendJob(sb, s, "militia", Profession.Militiaman);
+            AppendJob(sb, s, "scholar", Profession.Scholar);
+            AppendJob(sb, s, "idle", Profession.Idle);
+            return sb.ToString().TrimEnd();
+        }
+
+        private static void AppendJob(StringBuilder sb, Settlement s, string label, Profession p)
+        {
+            int n = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+                if (s.Citizens[i].Alive && s.Citizens[i].Profession == p &&
+                    (p == Profession.Idle || s.Citizens[i].Age >= s.Config.WorkingAge)) n++;
+            if (n > 0) sb.Append($"{label}:{n}  ");
+        }
+
+        private static bool TryParseBuildingType(string token, out BuildingType type)
+        {
+            switch (token.ToLowerInvariant())
+            {
+                case "forager": case "foragerhut": type = BuildingType.ForagerHut; return true;
+                case "woodcutter": case "woodcuttercamp": type = BuildingType.WoodcutterCamp; return true;
+                case "store": case "storehouse": type = BuildingType.Storehouse; return true;
+                case "tower": case "watchtower": type = BuildingType.Watchtower; return true;
+                default: return Enum.TryParse(token, true, out type) && Enum.IsDefined(typeof(BuildingType), type);
+            }
+        }
+
+        private static bool OccupiedAt(Settlement s, int x, int y)
+        {
+            for (int i = 0; i < s.Buildings.Count; i++)
+                if (s.Buildings[i].X == x && s.Buildings[i].Y == y) return true;
+            return false;
+        }
+
+        private static bool FindBuildTile(Settlement s, out int x, out int y)
+        {
+            for (int r = 0; r <= 24; r++)
+                for (int dy = -r; dy <= r; dy++)
+                    for (int dx = -r; dx <= r; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r) continue; // walk outward ring by ring
+                        int tx = s.CenterX + dx, ty = s.CenterY + dy;
+                        if (!s.Map.InBounds(tx, ty) || s.Map.Get(tx, ty).IsWater || OccupiedAt(s, tx, ty)) continue;
+                        x = tx; y = ty; return true;
+                    }
+            x = s.CenterX; y = s.CenterY; return false;
+        }
+
+        private static bool TryF(string s, out float v) =>
+            float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v);
+
+        private static List<string> SplitCommands(string commands) =>
+            new List<string>(commands.Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
+
+        private static List<string> ReadStdinCommands()
+        {
+            var lines = new List<string>();
+            string? line;
+            while ((line = Console.In.ReadLine()) != null) lines.Add(line);
+            return lines;
+        }
+
+        // Live single-key control, translated into the same command strings the script path uses.
+        private static bool TryReadKeyCommand(out string line)
+        {
+            line = string.Empty;
+            try { if (!Console.KeyAvailable) return false; }
+            catch { return false; } // input redirected / no console
+            ConsoleKeyInfo k = Console.ReadKey(true);
+            switch (char.ToLowerInvariant(k.KeyChar))
+            {
+                case ' ': line = "\0pause"; return true;
+                case '+': case '=': line = "speed 8"; return true;
+                case '-': line = "speed 1"; return true;
+                case '.': line = "step 1"; return true;
+                case 'b': Console.Write("\nbuild> "); line = "build " + (Console.ReadLine() ?? ""); return true;
+                case 'l': Console.Write("\nlabor> "); line = "labor " + (Console.ReadLine() ?? ""); return true;
+                case 's': line = "save"; return true;
+                case 'o': line = "load"; return true;
+                case 'h': case '?': line = "help"; return true;
+                case 'q': line = "quit"; return true;
+                default: return false;
+            }
         }
 
         // ---------------------------------------------------------------- storage & preserving (§8)

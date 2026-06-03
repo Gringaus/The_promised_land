@@ -16,7 +16,7 @@ Rules:
 Code in this folder is added during the Unity-Editor stages (it needs a GPU and the
 Editor, which the headless build environment does not have).
 
-## What's here (Module 10 scaffold)
+## What's here (Module 10 scaffold + Module 15 interactive view)
 
 A first runnable slice that makes the core visible in the Editor without any HDRP/scene
 authoring. It uses IMGUI + a generated texture, so it works in any render pipeline.
@@ -31,17 +31,22 @@ authoring. It uses IMGUI + a generated texture, so it works in any render pipeli
 - `Runtime/ColonyDebugOverlay` — an IMGUI overlay drawing the map and a live read-out
   (season, population, food/fuel, goods, buildings, and — when enabled — threat and
   demographics), plus pause/speed/regenerate controls.
+- `Runtime/ColonyMapView` (Module 15) — an **interactive** IMGUI view: pan (middle/right-drag
+  or arrow keys) and zoom-to-cursor (scroll wheel); left-click to select a tile and read its
+  details; a build palette (respecting tech locks) places blueprints on click, which the
+  colony's builders then raise. Buildings show as markers (amber building, blue done). Use this
+  *or* `ColonyDebugOverlay`.
 - `Runtime/ColonyAutoBootstrap` — optional: with the scripting define `FOUNDERSLANDS_AUTORUN`,
-  spawns the host + overlay automatically so any scene runs the sim.
+  spawns the host + interactive view automatically so any scene runs the sim.
 
 ### Run it
 
 1. Open the project in Unity (HDRP 6.x). Let it import and compile the assemblies.
-2. In any scene, create an empty GameObject and add **Colony Host** (the overlay is added
-   automatically via `[RequireComponent]`). Optionally assign authored config assets and set
-   the seed (e.g. `green-valley` — the same seed reproduces the CLI world exactly).
-3. Press **Play**. The procedural map and a live colony read-out appear; use the on-screen
-   buttons to pause, change speed, or regenerate.
+2. In any scene, create an empty GameObject and add **Colony Map View** — it pulls in **Colony
+   Host** automatically via `[RequireComponent]`. Optionally assign authored config assets and
+   set the seed (e.g. `green-valley` — the same seed reproduces the CLI world exactly).
+3. Press **Play**. The procedural map appears; pan/zoom, click a tile to inspect it, pick a
+   building and click to place it, and use the panel to pause/change speed/regenerate.
 
 Alternatively, add `FOUNDERSLANDS_AUTORUN` to *Project Settings ▸ Player ▸ Scripting Define
 Symbols* and just press Play in an empty scene.

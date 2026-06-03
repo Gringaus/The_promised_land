@@ -3,6 +3,7 @@ using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Mathematics;
 using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Production;
+using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
 
 namespace FoundersLands.Simulation.Settlements
@@ -26,6 +27,7 @@ namespace FoundersLands.Simulation.Settlements
             Produce(s, season, efficiency);
             Construct(s, season, efficiency);
             WearTools(s);
+            ThreatSystem.Step(s, season); // bandits may steal/raid before the day's spoilage and meals
             s.Storehouse.ApplySpoilage(s.Catalog);
             int deaths = ConsumeAndAge(s, season);
 

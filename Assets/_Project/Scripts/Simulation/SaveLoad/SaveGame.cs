@@ -7,6 +7,7 @@ using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Settlements;
+using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.World;
 
@@ -42,6 +43,12 @@ namespace FoundersLands.Simulation.SaveLoad
             sb.Append("CLK ").Append(s.Clock.Day).Append('\n');
             sb.Append("RNG ").Append(s.Rng.State.ToString(CultureInfo.InvariantCulture)).Append('\n');
             sb.Append("DTH ").Append(s.TotalDeaths).Append('\n');
+
+            ThreatState th = s.Threat;
+            sb.Append("THR ").Append(F(th.Pressure)).Append(' ').Append((int)th.Stage).Append(' ')
+              .Append(th.DaysInStage).Append(' ').Append(F(th.CampStrength)).Append(' ')
+              .Append(th.TotalRaids).Append(' ').Append(th.TotalThefts).Append(' ')
+              .Append(F(th.TotalStolen)).Append(' ').Append(th.TotalCasualties).Append('\n');
 
             sb.Append("CIT ").Append(s.Citizens.Count).Append('\n');
             for (int i = 0; i < s.Citizens.Count; i++)
@@ -91,6 +98,8 @@ namespace FoundersLands.Simulation.SaveLoad
             ResourceQuality forage = ResourceQuality.Standard;
             float foodFactor = 0f, firewoodFactor = 0f, stoneFactor = 0f, ironFactor = 0f, capacity = 0f;
             ulong rngState = 0;
+            float thrPressure = 0f, thrCamp = 0f, thrStolen = 0f;
+            int thrStage = 0, thrDays = 0, thrRaids = 0, thrThefts = 0, thrCasualties = 0;
 
             var citizens = new List<string[]>();
             var stacks = new List<string[]>();
@@ -120,6 +129,10 @@ namespace FoundersLands.Simulation.SaveLoad
                     case "CLK": day = Int(t[1]); break;
                     case "RNG": rngState = ulong.Parse(t[1], CultureInfo.InvariantCulture); break;
                     case "DTH": deaths = Int(t[1]); break;
+                    case "THR":
+                        thrPressure = Flt(t[1]); thrStage = Int(t[2]); thrDays = Int(t[3]); thrCamp = Flt(t[4]);
+                        thrRaids = Int(t[5]); thrThefts = Int(t[6]); thrStolen = Flt(t[7]); thrCasualties = Int(t[8]);
+                        break;
                     case "STO": capacity = Flt(t[1]); break;
                     case "C": citizens.Add(t); break;
                     case "S": stacks.Add(t); break;
@@ -142,6 +155,15 @@ namespace FoundersLands.Simulation.SaveLoad
                 Rng = new DeterministicRng(rngState)
             };
             s.Clock.Advance(day);
+
+            s.Threat.Pressure = thrPressure;
+            s.Threat.Stage = (ThreatStage)thrStage;
+            s.Threat.DaysInStage = thrDays;
+            s.Threat.CampStrength = thrCamp;
+            s.Threat.TotalRaids = thrRaids;
+            s.Threat.TotalThefts = thrThefts;
+            s.Threat.TotalStolen = thrStolen;
+            s.Threat.TotalCasualties = thrCasualties;
 
             // Set the effective capacity before adding goods so a full storehouse is not
             // clamped on load (a built storehouse may have raised capacity above the base).

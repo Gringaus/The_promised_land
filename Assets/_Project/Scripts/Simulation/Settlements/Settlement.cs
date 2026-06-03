@@ -4,6 +4,7 @@ using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.Production;
+using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.World;
 
@@ -44,11 +45,15 @@ namespace FoundersLands.Simulation.Settlements
         public float AvgShelterQuality;
         public float ForagerBonus;
         public float WoodcutterBonus;
+        public float BuildingDefense; // defence from completed towers/palisade (GDD §13)
         public readonly float BaseStorageCapacity;
 
         public DeterministicRng Rng;
 
         public int TotalDeaths;
+
+        // AI Director state (GDD §13); inert while Config.EnableThreats is false.
+        public readonly ThreatState Threat = new ThreatState();
 
         public Settlement(WorldMap map, int centerX, int centerY, SettlementConfig config,
             ResourceCatalog catalog, SeasonDef[] seasons, BuildingCatalog buildingCatalog = null,
@@ -134,7 +139,7 @@ namespace FoundersLands.Simulation.Settlements
         public void RecomputeBuildingEffects()
         {
             int housing = 0;
-            float shelterWeighted = 0f, storage = 0f, forager = 0f, woodcutter = 0f;
+            float shelterWeighted = 0f, storage = 0f, forager = 0f, woodcutter = 0f, defense = 0f;
 
             for (int i = 0; i < Buildings.Count; i++)
             {
@@ -146,12 +151,14 @@ namespace FoundersLands.Simulation.Settlements
                 storage += def.StorageBonus;
                 forager += def.ForagerBonus;
                 woodcutter += def.WoodcutterBonus;
+                defense += def.DefenseBonus;
             }
 
             HousingCapacity = housing;
             AvgShelterQuality = housing > 0 ? shelterWeighted / housing : 0f;
             ForagerBonus = forager;
             WoodcutterBonus = woodcutter;
+            BuildingDefense = defense;
             Storehouse.Capacity = BaseStorageCapacity + storage;
         }
 
@@ -165,6 +172,7 @@ namespace FoundersLands.Simulation.Settlements
             h = Storehouse.Hash(h);
             h = StableHash.Combine(h, Buildings.Count);
             for (int i = 0; i < Buildings.Count; i++) h = Buildings[i].Hash(h);
+            h = Threat.Hash(h);
             return h;
         }
     }

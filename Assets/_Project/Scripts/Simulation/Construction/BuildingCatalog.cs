@@ -63,6 +63,15 @@ namespace FoundersLands.Simulation.Construction
                 { WorkRequired = 70f }
                 .Needs(ResourceType.Wood, 22f));
 
+            // Defences (Module 7, GDD §13). A watchtower watches and shoots; a palisade slows.
+            c.Add(new BuildingDef(BuildingType.Watchtower, "Watchtower")
+                { WorkRequired = 60f, DefenseBonus = 6f }
+                .Needs(ResourceType.Wood, 20f).Needs(ResourceType.Stone, 8f));
+
+            c.Add(new BuildingDef(BuildingType.Palisade, "Palisade")
+                { WorkRequired = 40f, DefenseBonus = 3f }
+                .Needs(ResourceType.Wood, 24f));
+
             return c;
         }
     }

@@ -35,6 +35,7 @@ namespace FoundersLands.Simulation.Construction
         public float StorageBonus;      // added storehouse capacity
         public float ForagerBonus;      // +fraction to forager output
         public float WoodcutterBonus;   // +fraction to woodcutter output
+        public float DefenseBonus;      // defence points vs bandits (GDD §13)
 
         public BuildingDef(BuildingType type, string name)
         {

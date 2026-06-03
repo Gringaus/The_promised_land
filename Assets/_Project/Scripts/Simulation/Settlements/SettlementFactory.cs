@@ -51,6 +51,8 @@ namespace FoundersLands.Simulation.Settlements
                 Rng = DeterministicRng.Stream(seed, StreamSettlement)
             };
 
+            if (config.EnableThreats) settlement.Threat.CampStrength = config.CampStartStrength;
+
             PopulateCitizens(settlement, config);
 
             // Starting stock so day one is survivable (GDD §6 "стартовые ресурсы").
@@ -206,6 +208,7 @@ namespace FoundersLands.Simulation.Settlements
             int builders = (int)System.Math.Round(pop * config.BuilderShare);
             int miners = (int)System.Math.Round(pop * config.MinerShare);
             int craftsmen = (int)System.Math.Round(pop * config.CraftsmanShare);
+            int militia = (int)System.Math.Round(pop * config.MilitiaShare);
 
             // Cumulative thresholds; any remainder becomes idle.
             int tF = foragers;
@@ -215,6 +218,7 @@ namespace FoundersLands.Simulation.Settlements
             int tB = tQ + builders;
             int tM = tB + miners;
             int tC = tM + craftsmen;
+            int tMil = tC + militia;
 
             for (int i = 0; i < pop; i++)
             {
@@ -225,6 +229,7 @@ namespace FoundersLands.Simulation.Settlements
                                 : i < tB ? Profession.Builder
                                 : i < tM ? Profession.Miner
                                 : i < tC ? Profession.Craftsman
+                                : i < tMil ? Profession.Militiaman
                                 : Profession.Idle;
 
                 string name = Names[s.Rng.NextInt(0, Names.Length)];

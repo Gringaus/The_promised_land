@@ -13,6 +13,7 @@ namespace FoundersLands.Simulation.Population
         Quarryman = 4,   // добывает камень (Stone)
         Builder = 5,     // строит по чертежам (GDD §10)
         Miner = 6,       // добывает железную руду (IronOre)
-        Craftsman = 7    // работает в мастерских по рецептам (GDD §12)
+        Craftsman = 7,   // работает в мастерских по рецептам (GDD §12)
+        Militiaman = 8   // ополчение/дружина — обороняет колонию (GDD §13)
     }
 }

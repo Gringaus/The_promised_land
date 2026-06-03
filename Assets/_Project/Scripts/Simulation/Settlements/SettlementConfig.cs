@@ -18,6 +18,7 @@ namespace FoundersLands.Simulation.Settlements
         public float BuilderShare = 0.0f;
         public float MinerShare = 0.0f;
         public float CraftsmanShare = 0.0f;
+        public float MilitiaShare = 0.0f;
 
         public float StorehouseCapacity = 6000f;
 
@@ -67,6 +68,30 @@ namespace FoundersLands.Simulation.Settlements
         // Sheltered citizens need less firewood. Fully housed in good shelter cuts the
         // winter fuel demand by up to this fraction (GDD §10 housing/warmth).
         public float WarmthReductionMax = 0.5f;
+
+        // Threat layer / AI Director (GDD §13). Off by default so Modules 2-6 are unchanged;
+        // the "raiders" scenario turns it on. Wealth and a nearby camp drive pressure up the
+        // escalation ladder; militia and defensive buildings push it back down and soften blows.
+        public bool EnableThreats = false;
+        public float MilitiaDefense = 2.0f;       // defence points per militiaman
+        public float ThreatBaseGrowth = 0.5f;
+        public float ThreatWealthGrowth = 2.5f;   // scaled by wealth / ThreatWealthScale
+        public float ThreatWealthScale = 6000f;
+        public float ThreatDefenseDecay = 0.5f;   // pressure suppressed per defence point
+        public float CampStartStrength = 8f;
+        public float CampMaxStrength = 30f;
+        public float CampRegenPerDay = 0.3f;
+        public float TheftChance = 0.35f;         // per day while in the Thefts stage
+        public float TheftUnits = 25f;
+        public float AmbushChance = 0.5f;         // per day while in the Ambush stage
+        public float AmbushUnits = 45f;
+        public float AmbushInjury = 5f;           // health hit on a successful ambush
+        public int RaidIntervalDays = 15;         // raids recur while pressure stays at raid level
+        public float RaidFraction = 0.15f;        // fraction of stored goods looted in a raid
+        public float RaidEssentialCapFraction = 0.3f; // raiders skim at most this share of food/fuel
+        public float RaidInjury = 16f;            // health hit to everyone in a raid
+        public float RaidPressureRelief = 45f;    // pressure drop once raiders leave with loot
+        public float RaidCampCost = 6f;           // camp strength spent mounting a raid
 
         // Health dynamics.
         public float StarveHealthLossPerDay = 16f;

@@ -8,8 +8,10 @@ using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Logistics;
 using FoundersLands.Simulation.Mathematics;
 using FoundersLands.Simulation.Pathfinding;
+using FoundersLands.Simulation.Population;
 using FoundersLands.Simulation.SaveLoad;
 using FoundersLands.Simulation.Settlements;
+using FoundersLands.Simulation.Threats;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.World;
 using Path = FoundersLands.Simulation.Pathfinding.Path;
@@ -52,6 +54,7 @@ namespace FoundersLands.SimViewer
             if (mode == "saveload") return RunSaveLoad(seed, daysPerSeason);
             if (mode == "logistics") return RunLogistics(seed);
             if (mode == "production") return RunProduction(seed, years, daysPerSeason);
+            if (mode == "raiders") return RunRaiders(seed, years, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -325,6 +328,78 @@ namespace FoundersLands.SimViewer
             Building b = colony.PlaceBlueprint(type, x, y);
             b.WorkDone = b.WorkRequired;
             b.Complete = true;
+        }
+
+        // ---------------------------------------------------------------- raiders (AI Director)
+
+        private static int RunRaiders(ulong seed, int years, int daysPerSeason)
+        {
+            Console.WriteLine("Founder's Lands — bandits & the AI Director (GDD §13)");
+            Console.WriteLine("Two equally rich colonies on the same seed: one left open, one kept guarded.");
+            RunOneRaider(seed, years, daysPerSeason, defended: false);
+            RunOneRaider(seed, years, daysPerSeason, defended: true);
+            return 0;
+        }
+
+        private static void RunOneRaider(ulong seed, int years, int daysPerSeason, bool defended)
+        {
+            WorldMap map = WorldGenerator.Generate(new WorldGenSettings { Width = 128, Height = 128 }, seed);
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 40,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.45f, WoodcutterShare = 0.15f, LoggerShare = 0.08f,
+                QuarrymanShare = 0.04f, MinerShare = 0.06f, CraftsmanShare = 0.10f,
+                MilitiaShare = defended ? 0.10f : 0.0f,
+                StorehouseCapacity = 20000f,
+                StartingFoodUnits = 400f, StartingFirewoodUnits = 350f,
+                StartingWoodUnits = 60f, StartingStoneUnits = 40f,
+                EnableThreats = true
+            };
+            Settlement colony = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+            colony.Storehouse.Add(ResourceType.IronOre, ResourceQuality.Standard, 20f);
+
+            int gx = colony.CenterX, gy = colony.CenterY;
+            PlaceComplete(colony, BuildingType.Storehouse, gx + 1, gy);
+            for (int i = 0; i < 8; i++) PlaceComplete(colony, BuildingType.House, gx + 2 + i, gy);
+            PlaceComplete(colony, BuildingType.Sawmill, gx, gy + 1);
+            PlaceComplete(colony, BuildingType.Smelter, gx, gy + 2);
+            PlaceComplete(colony, BuildingType.Smithy, gx, gy + 3);
+            PlaceComplete(colony, BuildingType.Market, gx, gy + 4);
+            if (defended)
+            {
+                PlaceComplete(colony, BuildingType.Watchtower, gx - 1, gy);
+                PlaceComplete(colony, BuildingType.Watchtower, gx - 1, gy + 2);
+                PlaceComplete(colony, BuildingType.Palisade, gx - 1, gy + 4);
+            }
+
+            int militia = 0;
+            foreach (var cz in colony.Citizens) if (cz.Profession == Profession.Militiaman) militia++;
+
+            Console.WriteLine();
+            Console.WriteLine(defended
+                ? $"== GUARDED colony ({militia} militia + 2 towers + palisade) =="
+                : "== OPEN colony (no militia, no walls) ==");
+            Console.WriteLine($"{"Year",4} {"Season",-7} {"Stage",-7} {"Press",6} {"Camp",5} {"Pop",4} {"Food",6} {"Tools",6} {"Health",7}  raids/stolen");
+
+            int totalDays = years * daysPerSeason * 4;
+            for (int d = 0; d < totalDays; d++)
+            {
+                DayReport r = SettlementSimulation.Step(colony);
+                var th = colony.Threat;
+                if ((r.Day % daysPerSeason) == (daysPerSeason - 1))
+                {
+                    Console.WriteLine($"{r.Year,4} {r.Season,-7} {th.Stage,-7} {th.Pressure,6:0.0} {th.CampStrength,5:0} " +
+                                      $"{r.Population,4} {r.FoodUnits,6:0} {colony.Storehouse.Count(ResourceType.Tools),6:0} {r.AvgHealth,7:0.0}  " +
+                                      $"{th.TotalRaids}/{th.TotalStolen:0}");
+                }
+                if (colony.AlivePopulation == 0) { Console.WriteLine($"  -- wiped out day {r.Day} --"); break; }
+            }
+
+            ThreatState f = colony.Threat;
+            Console.WriteLine($"  totals: raids={f.TotalRaids}, thefts={f.TotalThefts}, goods stolen={f.TotalStolen:0}, " +
+                              $"raid casualties={f.TotalCasualties}, survivors={colony.AlivePopulation}/40.");
         }
 
         // ---------------------------------------------------------------- logistics

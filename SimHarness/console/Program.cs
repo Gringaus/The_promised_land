@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using FoundersLands.Simulation.Construction;
 using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Settlements;
@@ -41,6 +42,7 @@ namespace FoundersLands.SimViewer
             }
 
             if (mode == "survive") return RunSurvival(seed, years, pop, daysPerSeason);
+            if (mode == "build") return RunBuild(seed, years, pop, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -105,6 +107,107 @@ namespace FoundersLands.SimViewer
                               $"({popAfterFirstWinter}/{started} alive after winter of year 0)");
             Console.WriteLine($"After {years} years: {survivors}/{started} alive, total deaths {colony.TotalDeaths}.");
             return 0;
+        }
+
+        // ---------------------------------------------------------------- construction
+
+        private static int RunBuild(ulong seed, int years, int pop, int daysPerSeason)
+        {
+            if (pop < 28) pop = 28; // need enough hands to both feed the colony and build
+
+            var settings = new WorldGenSettings { Width = 128, Height = 128 };
+            WorldMap map = WorldGenerator.Generate(settings, seed);
+
+            var config = new SettlementConfig
+            {
+                StartingPopulation = pop,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.50f,
+                WoodcutterShare = 0.20f,
+                LoggerShare = 0.12f,
+                QuarrymanShare = 0.06f,
+                BuilderShare = 0.12f,
+                // Bigger buffer: building diverts hands from food/fuel, so the colony must
+                // coast through the first lean spring on stored supplies (GDD §9, §10).
+                StartingFoodUnits = 300f,
+                StartingFirewoodUnits = 250f,
+                StartingWoodUnits = 80f,
+                StartingStoneUnits = 40f
+            };
+            ResourceCatalog catalog = ResourceCatalog.CreateDefault();
+            SeasonDef[] seasons = SeasonDef.CreateDefault();
+            Settlement colony = SettlementFactory.Create(map, seed, config, catalog, seasons);
+
+            PlaceBuildPlan(colony);
+            int planned = colony.Buildings.Count;
+
+            Console.WriteLine("Founder's Lands — construction run (GDD §10)");
+            Console.WriteLine($"seed={seed}  site=({colony.CenterX},{colony.CenterY})  population={colony.AlivePopulation}");
+            Console.WriteLine($"factors: food={colony.FoodFactor:0.00} firewood={colony.FirewoodFactor:0.00} stone={colony.StoneFactor:0.00}  blueprints queued={planned}");
+            Console.WriteLine($"start materials: wood={colony.Storehouse.Count(ResourceType.Wood):0}, stone={colony.Storehouse.Count(ResourceType.Stone):0}");
+            Console.WriteLine();
+            Console.WriteLine($"{"Year",4} {"Season",-7} {"Pop",4} {"Food",6} {"Firewd",7} {"Wood",6} {"Stone",6} {"Built",6} {"WIP",4} {"Cap",6} {"House",6}");
+
+            int totalDays = years * daysPerSeason * 4;
+            for (int d = 0; d < totalDays; d++)
+            {
+                DayReport r = SettlementSimulation.Step(colony);
+                bool lastDayOfSeason = (r.Day % daysPerSeason) == (daysPerSeason - 1);
+                if (lastDayOfSeason)
+                {
+                    colony.RecomputeBuildingEffects();
+                    Console.WriteLine($"{r.Year,4} {r.Season,-7} {r.Population,4} {r.FoodUnits,6:0} {r.FirewoodUnits,7:0} " +
+                                      $"{colony.Storehouse.Count(ResourceType.Wood),6:0} {colony.Storehouse.Count(ResourceType.Stone),6:0} " +
+                                      $"{r.BuildingsComplete,6} {r.BuildingsUnderConstruction,4} {colony.Storehouse.Capacity,6:0} {colony.HousingCapacity,6}");
+                }
+                if (colony.AlivePopulation == 0)
+                {
+                    Console.WriteLine($"  -- colony wiped out on day {r.Day} ({r.Season}) --");
+                    break;
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"Built {colony.BuildingsComplete}/{planned} buildings.  Housing for {colony.HousingCapacity} " +
+                              $"(pop {colony.AlivePopulation}).  Storehouse capacity {colony.Storehouse.Capacity:0}.");
+            return 0;
+        }
+
+        private static void PlaceBuildPlan(Settlement colony)
+        {
+            BuildingType[] plan =
+            {
+                BuildingType.Storehouse,
+                BuildingType.House, BuildingType.House, BuildingType.House,
+                BuildingType.House, BuildingType.House,
+                BuildingType.ForagerHut, BuildingType.WoodcutterCamp
+            };
+
+            var spots = LandSpotsNear(colony.Map, colony.CenterX, colony.CenterY, plan.Length);
+            for (int i = 0; i < plan.Length; i++)
+            {
+                int x = i < spots.Count ? spots[i].X : colony.CenterX;
+                int y = i < spots.Count ? spots[i].Y : colony.CenterY;
+                colony.PlaceBlueprint(plan[i], x, y);
+            }
+        }
+
+        private static List<(int X, int Y)> LandSpotsNear(WorldMap map, int cx, int cy, int count)
+        {
+            var list = new List<(int X, int Y)>();
+            for (int r = 1; r <= 40 && list.Count < count; r++)
+            {
+                for (int dy = -r; dy <= r && list.Count < count; dy++)
+                {
+                    for (int dx = -r; dx <= r && list.Count < count; dx++)
+                    {
+                        if (dx > -r && dx < r && dy > -r && dy < r) continue;
+                        int x = cx + dx, y = cy + dy;
+                        if (map.InBounds(x, y) && !map.Get(x, y).IsWater) list.Add((x, y));
+                    }
+                }
+            }
+            return list;
         }
 
         // ---------------------------------------------------------------- map preview

@@ -14,9 +14,12 @@ namespace FoundersLands.Simulation.Settlements
         public readonly float FirewoodUnits;
         public readonly float StoredNutrition;
         public readonly float AvgHealth;
+        public readonly int BuildingsComplete;
+        public readonly int BuildingsUnderConstruction;
 
         public DayReport(int day, int year, Season season, int population, int deathsToday,
-            float foodUnits, float firewoodUnits, float storedNutrition, float avgHealth)
+            float foodUnits, float firewoodUnits, float storedNutrition, float avgHealth,
+            int buildingsComplete, int buildingsUnderConstruction)
         {
             Day = day;
             Year = year;
@@ -27,6 +30,8 @@ namespace FoundersLands.Simulation.Settlements
             FirewoodUnits = firewoodUnits;
             StoredNutrition = storedNutrition;
             AvgHealth = avgHealth;
+            BuildingsComplete = buildingsComplete;
+            BuildingsUnderConstruction = buildingsUnderConstruction;
         }
     }
 }

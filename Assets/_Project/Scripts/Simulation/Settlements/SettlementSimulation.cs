@@ -1,3 +1,4 @@
+using FoundersLands.Simulation.Construction;
 using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Mathematics;
 using FoundersLands.Simulation.Population;
@@ -17,7 +18,9 @@ namespace FoundersLands.Simulation.Settlements
         {
             SeasonDef season = s.Seasons[(int)s.Clock.Season];
 
+            s.RecomputeBuildingEffects();
             Gather(s, season);
+            Construct(s, season);
             s.Storehouse.ApplySpoilage(s.Catalog);
             int deaths = ConsumeAndAge(s, season);
 
@@ -25,7 +28,8 @@ namespace FoundersLands.Simulation.Settlements
                 s.Clock.Day, s.Clock.Year, s.Clock.Season,
                 s.AlivePopulation, deaths,
                 s.FoodUnits(), s.Storehouse.Count(ResourceType.Firewood),
-                s.StoredNutrition(), s.AverageHealth);
+                s.StoredNutrition(), s.AverageHealth,
+                s.BuildingsComplete, s.BuildingsUnderConstruction);
 
             s.Clock.Advance(1);
             return report;
@@ -54,7 +58,7 @@ namespace FoundersLands.Simulation.Settlements
                 {
                     case Profession.Forager:
                     {
-                        float nutrition = c.ForagerNutritionPerDay * season.FoodGatherMult * season.WorkSpeedMult * s.FoodFactor;
+                        float nutrition = c.ForagerNutritionPerDay * (1f + s.ForagerBonus) * season.FoodGatherMult * season.WorkSpeedMult * s.FoodFactor;
                         if (nutrition > 0f && foodDef.Nutrition > 0f)
                         {
                             float units = nutrition / (foodDef.Nutrition * foodQualityMult);
@@ -64,12 +68,43 @@ namespace FoundersLands.Simulation.Settlements
                     }
                     case Profession.Woodcutter:
                     {
-                        float firewood = c.WoodcutterFirewoodPerDay * season.FirewoodGatherMult * season.WorkSpeedMult * s.FirewoodFactor;
+                        float firewood = c.WoodcutterFirewoodPerDay * (1f + s.WoodcutterBonus) * season.FirewoodGatherMult * season.WorkSpeedMult * s.FirewoodFactor;
                         if (firewood > 0f) s.Storehouse.Add(ResourceType.Firewood, ResourceQuality.Standard, firewood);
+                        break;
+                    }
+                    case Profession.Logger:
+                    {
+                        // Timber comes from forest, like firewood, so it shares the forest factor.
+                        float wood = c.LoggerWoodPerDay * season.FirewoodGatherMult * season.WorkSpeedMult * s.FirewoodFactor;
+                        if (wood > 0f) s.Storehouse.Add(ResourceType.Wood, ResourceQuality.Standard, wood);
+                        break;
+                    }
+                    case Profession.Quarryman:
+                    {
+                        float stone = c.QuarrymanStonePerDay * season.WorkSpeedMult * s.StoneFactor;
+                        if (stone > 0f) s.Storehouse.Add(ResourceType.Stone, ResourceQuality.Standard, stone);
                         break;
                     }
                 }
             }
+        }
+
+        private static void Construct(Settlement s, SeasonDef season)
+        {
+            if (s.Buildings.Count == 0) return;
+
+            int builders = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+            {
+                Citizen cz = s.Citizens[i];
+                if (cz.Alive && cz.Profession == Profession.Builder) builders++;
+            }
+
+            // Construction slows in winter and speeds in summer (GDD §9). No builders, no work.
+            float work = builders * s.Config.BuilderWorkPerDay * season.WorkSpeedMult;
+            if (work <= 0f) return;
+
+            ConstructionSystem.Step(s.Buildings, s.Storehouse, work);
         }
 
         private static int ConsumeAndAge(Settlement s, SeasonDef season)
@@ -86,6 +121,12 @@ namespace FoundersLands.Simulation.Settlements
             float foodDeficit = foodDemand > 0f ? M.Clamp01(1f - foodGot / foodDemand) : 0f;
 
             float heatNeedPer = c.FirewoodPerPersonPerDayWinter * season.FirewoodNeedMult;
+            // Completed housing shelters citizens and cuts the fuel they need (GDD §10).
+            if (heatNeedPer > 0f && s.HousingCapacity > 0)
+            {
+                float sheltered = s.HousingCapacity >= alive ? 1f : (float)s.HousingCapacity / alive;
+                heatNeedPer *= 1f - c.WarmthReductionMax * sheltered * s.AvgShelterQuality;
+            }
             float heatDemand = alive * heatNeedPer;
             float heatGot = heatDemand > 0f ? s.Storehouse.ConsumeHeat(s.Catalog, heatDemand) : 0f;
             float heatDeficit = heatDemand > 0f ? M.Clamp01(1f - heatGot / heatDemand) : 0f;

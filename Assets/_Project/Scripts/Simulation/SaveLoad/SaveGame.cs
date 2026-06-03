@@ -50,6 +50,10 @@ namespace FoundersLands.Simulation.SaveLoad
               .Append(th.TotalRaids).Append(' ').Append(th.TotalThefts).Append(' ')
               .Append(F(th.TotalStolen)).Append(' ').Append(th.TotalCasualties).Append('\n');
 
+            sb.Append("POP ").Append(F(s.BirthProgress)).Append(' ').Append(F(s.MigrationProgress)).Append(' ')
+              .Append(s.NextCitizenId).Append(' ').Append(s.TotalBirths).Append(' ')
+              .Append(s.TotalImmigrants).Append(' ').Append(s.TotalLeft).Append(' ').Append(s.NaturalDeaths).Append('\n');
+
             sb.Append("CIT ").Append(s.Citizens.Count).Append('\n');
             for (int i = 0; i < s.Citizens.Count; i++)
             {
@@ -101,6 +105,8 @@ namespace FoundersLands.Simulation.SaveLoad
             ulong rngState = 0;
             float thrPressure = 0f, thrCamp = 0f, thrStolen = 0f;
             int thrStage = 0, thrDays = 0, thrRaids = 0, thrThefts = 0, thrCasualties = 0;
+            float birthProgress = 0f, migrationProgress = 0f;
+            int nextId = 0, totalBirths = 0, totalImmigrants = 0, totalLeft = 0, naturalDeaths = 0;
 
             var citizens = new List<string[]>();
             var stacks = new List<string[]>();
@@ -133,6 +139,10 @@ namespace FoundersLands.Simulation.SaveLoad
                     case "THR":
                         thrPressure = Flt(t[1]); thrStage = Int(t[2]); thrDays = Int(t[3]); thrCamp = Flt(t[4]);
                         thrRaids = Int(t[5]); thrThefts = Int(t[6]); thrStolen = Flt(t[7]); thrCasualties = Int(t[8]);
+                        break;
+                    case "POP":
+                        birthProgress = Flt(t[1]); migrationProgress = Flt(t[2]); nextId = Int(t[3]);
+                        totalBirths = Int(t[4]); totalImmigrants = Int(t[5]); totalLeft = Int(t[6]); naturalDeaths = Int(t[7]);
                         break;
                     case "STO": capacity = Flt(t[1]); break;
                     case "C": citizens.Add(t); break;
@@ -209,6 +219,14 @@ namespace FoundersLands.Simulation.SaveLoad
                     b.CropGrowth = Flt(t[cropIdx + 1]);
                 }
             }
+
+            s.BirthProgress = birthProgress;
+            s.MigrationProgress = migrationProgress;
+            s.NextCitizenId = nextId > 0 ? nextId : s.Citizens.Count;
+            s.TotalBirths = totalBirths;
+            s.TotalImmigrants = totalImmigrants;
+            s.TotalLeft = totalLeft;
+            s.NaturalDeaths = naturalDeaths;
 
             s.RecomputeBuildingEffects();
             return s;

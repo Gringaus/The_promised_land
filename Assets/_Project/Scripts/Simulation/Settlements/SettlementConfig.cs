@@ -101,6 +101,25 @@ namespace FoundersLands.Simulation.Settlements
         public float RaidPressureRelief = 45f;    // pressure drop once raiders leave with loot
         public float RaidCampCost = 6f;           // camp strength spent mounting a raid
 
+        // Population dynamics / demographics (GDD §11). Off by default so the fixed-population
+        // scenarios of Modules 2-8 are unchanged; the demographics scenario turns it on.
+        public bool EnablePopulationDynamics = false;
+        public int WorkingAge = 16;                   // children below this don't work
+        public float ChildFoodFraction = 0.5f;        // a child eats this share of an adult's ration
+        public int FertileMinAge = 18;
+        public int FertileMaxAge = 45;
+        public float DailyBirthRatePerAdult = 0.0016f; // births per fertile adult per day, before modifiers
+        public int OldAgeStart = 66;
+        public float OldAgeMortalityScale = 0.02f;     // yearly death chance per year of age past OldAgeStart
+        public float MigrationDailyRate = 0.04f;       // scales net migration by attractiveness
+        public int ImmigrantMinAge = 18;
+        public int ImmigrantMaxAge = 35;
+        // Growth is gated by food-production capacity, not the (lagging) stored cushion, so a
+        // colony grows within its means instead of overshooting into famine. It grows freely while
+        // its population sits below this fraction of what its food workers can feed, and stops at
+        // capacity. As the workforce expands (migrants, children come of age) capacity rises.
+        public float GrowthFoodHeadroom = 0.70f;
+
         // Health dynamics.
         public float StarveHealthLossPerDay = 16f;
         public float ColdHealthLossPerDay = 16f;

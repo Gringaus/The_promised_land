@@ -56,6 +56,7 @@ namespace FoundersLands.SimViewer
             if (mode == "production") return RunProduction(seed, years, daysPerSeason);
             if (mode == "raiders") return RunRaiders(seed, years, daysPerSeason);
             if (mode == "farming") return RunFarming(seed, years, daysPerSeason);
+            if (mode == "demography") return RunDemography(seed, years, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -329,6 +330,65 @@ namespace FoundersLands.SimViewer
             Building b = colony.PlaceBlueprint(type, x, y);
             b.WorkDone = b.WorkRequired;
             b.Complete = true;
+        }
+
+        // ---------------------------------------------------------------- demography (births/aging/migration)
+
+        private static int RunDemography(ulong seed, int years, int daysPerSeason)
+        {
+            if (years < 12) years = 25; // growth and the stable plateau show over a generation
+            WorldMap map = WorldGenerator.Generate(new WorldGenSettings { Width = 128, Height = 128 }, seed);
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 16,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.62f, WoodcutterShare = 0.30f,
+                // A bountiful valley: food and fuel are plentiful per worker, so housing — not hunger
+                // or cold — is what caps growth, keeping the spotlight on the demographics.
+                ForagerNutritionPerDay = 7.0f, WoodcutterFirewoodPerDay = 9.0f,
+                StorehouseCapacity = 8000f,
+                StartingFoodUnits = 400f, StartingFirewoodUnits = 350f,
+                EnablePopulationDynamics = true
+            };
+            Settlement colony = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+
+            int gx = colony.CenterX, gy = colony.CenterY;
+            PlaceComplete(colony, BuildingType.Storehouse, gx + 1, gy);
+            for (int i = 0; i < 7; i++) PlaceComplete(colony, BuildingType.House, gx + 2 + i, gy); // room to grow into
+            colony.RecomputeBuildingEffects(); // so the header shows housing before day one
+
+            Console.WriteLine("Founder's Lands — demographics & growth (GDD §11)");
+            Console.WriteLine($"seed={seed}  start pop={colony.AlivePopulation}  housing={colony.HousingCapacity}");
+            Console.WriteLine("births need food + housing; migrants come for prosperity; the young work only at 16; elders pass.");
+            Console.WriteLine();
+            Console.WriteLine($"{"Year",4} {"Pop",4} {"Births",7} {"Immig",6} {"OldAge",7} {"Left",5} {"Starved",8} {"AvgAge",7} {"Health",7}");
+
+            int totalDays = years * daysPerSeason * 4;
+            for (int d = 0; d < totalDays; d++)
+            {
+                DayReport r = SettlementSimulation.Step(colony);
+                if (r.Day % (daysPerSeason * 4) == (daysPerSeason * 4 - 1))
+                {
+                    Console.WriteLine($"{r.Year,4} {colony.AlivePopulation,4} {colony.TotalBirths,7} {colony.TotalImmigrants,6} " +
+                                      $"{colony.NaturalDeaths,7} {colony.TotalLeft,5} {colony.TotalDeaths - colony.NaturalDeaths,8} " +
+                                      $"{AverageAge(colony),7:0.0} {colony.AverageHealth,7:0.0}");
+                }
+                if (colony.AlivePopulation == 0) { Console.WriteLine($"  -- died out year {r.Year} --"); break; }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"From {config.StartingPopulation} settlers to {colony.AlivePopulation}: " +
+                              $"{colony.TotalBirths} born, {colony.TotalImmigrants} arrived, " +
+                              $"{colony.NaturalDeaths} died of old age, {colony.TotalLeft} moved on.");
+            return 0;
+        }
+
+        private static float AverageAge(Settlement colony)
+        {
+            float sum = 0f; int n = 0;
+            foreach (var cz in colony.Citizens) if (cz.Alive) { sum += cz.Age; n++; }
+            return n == 0 ? 0f : sum / n;
         }
 
         // ---------------------------------------------------------------- farming (seasonal fields)

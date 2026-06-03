@@ -53,6 +53,15 @@ namespace FoundersLands.Simulation.Settlements
 
         public int TotalDeaths;
 
+        // Demographics (GDD §11); inert while Config.EnablePopulationDynamics is false.
+        public int NextCitizenId;
+        public float BirthProgress;
+        public float MigrationProgress;
+        public int TotalBirths;
+        public int TotalImmigrants;
+        public int TotalLeft;       // emigrated away
+        public int NaturalDeaths;   // died of old age
+
         // AI Director state (GDD §13); inert while Config.EnableThreats is false.
         public readonly ThreatState Threat = new ThreatState();
 
@@ -174,6 +183,12 @@ namespace FoundersLands.Simulation.Settlements
             h = StableHash.Combine(h, Buildings.Count);
             for (int i = 0; i < Buildings.Count; i++) h = Buildings[i].Hash(h);
             h = Threat.Hash(h);
+            h = StableHash.Combine(h, (int)(BirthProgress * 1000f));
+            h = StableHash.Combine(h, (int)(MigrationProgress * 1000f));
+            h = StableHash.Combine(h, TotalBirths);
+            h = StableHash.Combine(h, TotalImmigrants);
+            h = StableHash.Combine(h, TotalLeft);
+            h = StableHash.Combine(h, NaturalDeaths);
             return h;
         }
     }

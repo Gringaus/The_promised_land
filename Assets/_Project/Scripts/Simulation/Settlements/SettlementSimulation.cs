@@ -32,6 +32,7 @@ namespace FoundersLands.Simulation.Settlements
             ThreatSystem.Step(s, season); // bandits may steal/raid before the day's spoilage and meals
             s.Storehouse.ApplySpoilage(s.Catalog);
             int deaths = ConsumeAndAge(s, season);
+            PopulationSystem.Step(s); // births, migration, aging — uses today's hunger and health
 
             DayReport report = new DayReport(
                 s.Clock.Day, s.Clock.Year, s.Clock.Season,
@@ -194,8 +195,15 @@ namespace FoundersLands.Simulation.Settlements
 
             // Ration the whole settlement at once, then share any shortage equally — this
             // avoids the storehouse favouring whichever citizen happens to be processed
-            // first. Differential survival comes from age, not list order.
-            float foodDemand = alive * c.NutritionPerPersonPerDay;
+            // first. Differential survival comes from age, not list order. Children eat less
+            // (GDD §11); with population dynamics off there are no children, so this is just `alive`.
+            float foodMouths = 0f;
+            for (int i = 0; i < s.Citizens.Count; i++)
+            {
+                Citizen cz = s.Citizens[i];
+                if (cz.Alive) foodMouths += cz.Age < c.WorkingAge ? c.ChildFoodFraction : 1f;
+            }
+            float foodDemand = foodMouths * c.NutritionPerPersonPerDay;
             float foodGot = s.Storehouse.ConsumeNutrition(s.Catalog, foodDemand);
             float foodDeficit = foodDemand > 0f ? M.Clamp01(1f - foodGot / foodDemand) : 0f;
 

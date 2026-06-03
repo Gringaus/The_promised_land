@@ -55,6 +55,7 @@ namespace FoundersLands.Simulation.Settlements
             if (config.EnableThreats) settlement.Threat.CampStrength = config.CampStartStrength;
 
             PopulateCitizens(settlement, config);
+            settlement.NextCitizenId = settlement.Citizens.Count;
 
             // Starting stock so day one is survivable (GDD §6 "стартовые ресурсы").
             settlement.Storehouse.Add(settlement.PrimaryFood, ResourceQuality.Standard, config.StartingFoodUnits);

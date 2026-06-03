@@ -37,6 +37,7 @@ namespace FoundersLands.Simulation.Population
         {
             h = StableHash.Combine(h, Id);
             h = StableHash.Combine(h, Alive ? 1 : 0);
+            h = StableHash.Combine(h, Age);
             h = StableHash.Combine(h, (int)(Health * 100f));
             h = StableHash.Combine(h, (int)(Hunger * 1000f));
             h = StableHash.Combine(h, (int)(Cold * 1000f));

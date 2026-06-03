@@ -37,7 +37,8 @@ namespace FoundersLands.Simulation.SaveLoad
 
             sb.Append("SET ").Append(s.CenterX).Append(' ').Append(s.CenterY).Append(' ')
               .Append((int)s.PrimaryFood).Append(' ').Append((int)s.ForageQuality).Append(' ')
-              .Append(F(s.FoodFactor)).Append(' ').Append(F(s.FirewoodFactor)).Append(' ').Append(F(s.StoneFactor)).Append('\n');
+              .Append(F(s.FoodFactor)).Append(' ').Append(F(s.FirewoodFactor)).Append(' ')
+              .Append(F(s.StoneFactor)).Append(' ').Append(F(s.IronFactor)).Append('\n');
             sb.Append("CLK ").Append(s.Clock.Day).Append('\n');
             sb.Append("RNG ").Append(s.Rng.State.ToString(CultureInfo.InvariantCulture)).Append('\n');
             sb.Append("DTH ").Append(s.TotalDeaths).Append('\n');
@@ -88,7 +89,7 @@ namespace FoundersLands.Simulation.SaveLoad
             int cx = 0, cy = 0, day = 0, deaths = 0;
             ResourceType primaryFood = ResourceType.Berries;
             ResourceQuality forage = ResourceQuality.Standard;
-            float foodFactor = 0f, firewoodFactor = 0f, stoneFactor = 0f, capacity = 0f;
+            float foodFactor = 0f, firewoodFactor = 0f, stoneFactor = 0f, ironFactor = 0f, capacity = 0f;
             ulong rngState = 0;
 
             var citizens = new List<string[]>();
@@ -114,6 +115,7 @@ namespace FoundersLands.Simulation.SaveLoad
                         cx = Int(t[1]); cy = Int(t[2]);
                         primaryFood = (ResourceType)Int(t[3]); forage = (ResourceQuality)Int(t[4]);
                         foodFactor = Flt(t[5]); firewoodFactor = Flt(t[6]); stoneFactor = Flt(t[7]);
+                        if (t.Length > 8) ironFactor = Flt(t[8]);
                         break;
                     case "CLK": day = Int(t[1]); break;
                     case "RNG": rngState = ulong.Parse(t[1], CultureInfo.InvariantCulture); break;
@@ -135,6 +137,7 @@ namespace FoundersLands.Simulation.SaveLoad
                 FoodFactor = foodFactor,
                 FirewoodFactor = firewoodFactor,
                 StoneFactor = stoneFactor,
+                IronFactor = ironFactor,
                 TotalDeaths = deaths,
                 Rng = new DeterministicRng(rngState)
             };

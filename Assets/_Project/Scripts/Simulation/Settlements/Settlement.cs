@@ -3,6 +3,7 @@ using FoundersLands.Simulation.Construction;
 using FoundersLands.Simulation.Core;
 using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Population;
+using FoundersLands.Simulation.Production;
 using FoundersLands.Simulation.Time;
 using FoundersLands.Simulation.World;
 
@@ -25,6 +26,7 @@ namespace FoundersLands.Simulation.Settlements
         public readonly SimulationClock Clock;
         public readonly ResourceCatalog Catalog;
         public readonly BuildingCatalog BuildingCatalog;
+        public readonly RecipeCatalog Recipes;
         public readonly SeasonDef[] Seasons;
         public readonly SettlementConfig Config;
 
@@ -33,6 +35,7 @@ namespace FoundersLands.Simulation.Settlements
         public float FoodFactor;
         public float FirewoodFactor;
         public float StoneFactor;
+        public float IronFactor;
         public ResourceType PrimaryFood;
         public ResourceQuality ForageQuality;
 
@@ -48,7 +51,8 @@ namespace FoundersLands.Simulation.Settlements
         public int TotalDeaths;
 
         public Settlement(WorldMap map, int centerX, int centerY, SettlementConfig config,
-            ResourceCatalog catalog, SeasonDef[] seasons, BuildingCatalog buildingCatalog = null)
+            ResourceCatalog catalog, SeasonDef[] seasons, BuildingCatalog buildingCatalog = null,
+            RecipeCatalog recipes = null)
         {
             Map = map;
             CenterX = centerX;
@@ -57,6 +61,7 @@ namespace FoundersLands.Simulation.Settlements
             Catalog = catalog;
             Seasons = seasons;
             BuildingCatalog = buildingCatalog ?? BuildingCatalog.CreateDefault();
+            Recipes = recipes ?? RecipeCatalog.CreateDefault();
             Storehouse = new Inventory(config.StorehouseCapacity);
             BaseStorageCapacity = config.StorehouseCapacity;
             Clock = new SimulationClock(config.DaysPerSeason);

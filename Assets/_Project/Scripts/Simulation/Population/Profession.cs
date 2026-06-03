@@ -11,6 +11,8 @@ namespace FoundersLands.Simulation.Population
         Woodcutter = 2,  // заготавливает дрова
         Logger = 3,      // валит лес на строевую древесину (Wood)
         Quarryman = 4,   // добывает камень (Stone)
-        Builder = 5      // строит по чертежам (GDD §10)
+        Builder = 5,     // строит по чертежам (GDD §10)
+        Miner = 6,       // добывает железную руду (IronOre)
+        Craftsman = 7    // работает в мастерских по рецептам (GDD §12)
     }
 }

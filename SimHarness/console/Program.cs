@@ -51,6 +51,7 @@ namespace FoundersLands.SimViewer
             if (mode == "build") return RunBuild(seed, years, pop, daysPerSeason);
             if (mode == "saveload") return RunSaveLoad(seed, daysPerSeason);
             if (mode == "logistics") return RunLogistics(seed);
+            if (mode == "production") return RunProduction(seed, years, daysPerSeason);
             return RunMapPreview(seed, width, height);
         }
 
@@ -261,6 +262,69 @@ namespace FoundersLands.SimViewer
                 }
             }
             return list;
+        }
+
+        // ---------------------------------------------------------------- production
+
+        private static int RunProduction(ulong seed, int years, int daysPerSeason)
+        {
+            var settings = new WorldGenSettings { Width = 128, Height = 128 };
+            WorldMap map = WorldGenerator.Generate(settings, seed);
+
+            var config = new SettlementConfig
+            {
+                StartingPopulation = 40,
+                DaysPerSeason = daysPerSeason,
+                ForagerShare = 0.50f, WoodcutterShare = 0.16f, LoggerShare = 0.09f,
+                QuarrymanShare = 0.03f, MinerShare = 0.08f, CraftsmanShare = 0.10f,
+                StorehouseCapacity = 20000f, // ample so this demo isn't dominated by a full store
+                StartingFoodUnits = 400f, StartingFirewoodUnits = 350f,
+                StartingWoodUnits = 60f, StartingStoneUnits = 40f
+            };
+            Settlement colony = SettlementFactory.Create(map, seed, config,
+                ResourceCatalog.CreateDefault(), SeasonDef.CreateDefault());
+            colony.Storehouse.Add(ResourceType.IronOre, ResourceQuality.Standard, 20f); // prime the smelter
+
+            // Pre-build the infrastructure so this run highlights the production chains
+            // themselves (construction is demonstrated by --mode build).
+            int gx = colony.CenterX, gy = colony.CenterY;
+            PlaceComplete(colony, BuildingType.Storehouse, gx + 1, gy);
+            for (int i = 0; i < 8; i++) PlaceComplete(colony, BuildingType.House, gx + 2 + i, gy);
+            PlaceComplete(colony, BuildingType.Sawmill, gx, gy + 1);
+            PlaceComplete(colony, BuildingType.Smelter, gx, gy + 2);
+            PlaceComplete(colony, BuildingType.Smithy, gx, gy + 3);
+            PlaceComplete(colony, BuildingType.Market, gx, gy + 4);
+
+            Console.WriteLine("Founder's Lands — production chains & market (GDD §12)");
+            Console.WriteLine($"seed={seed}  pop={colony.AlivePopulation}  foodFactor={colony.FoodFactor:0.00}  firewoodFactor={colony.FirewoodFactor:0.00}  ironFactor={colony.IronFactor:0.00}");
+            Console.WriteLine("chains: Wood->Planks (sawmill), IronOre->Ingot (smelter), Ingot->Tools (smithy); market + tools boost work");
+            Console.WriteLine();
+            Console.WriteLine($"{"Year",4} {"Season",-7} {"Pop",4} {"Planks",7} {"Tools",6} {"Food",6} {"Firewd",7} {"Health",7}");
+
+            int totalDays = years * daysPerSeason * 4;
+            for (int d = 0; d < totalDays; d++)
+            {
+                DayReport r = SettlementSimulation.Step(colony);
+                if ((r.Day % daysPerSeason) == (daysPerSeason - 1))
+                {
+                    Console.WriteLine($"{r.Year,4} {r.Season,-7} {r.Population,4} " +
+                                      $"{colony.Storehouse.Count(ResourceType.Planks),7:0} " +
+                                      $"{colony.Storehouse.Count(ResourceType.Tools),6:0} {r.FoodUnits,6:0} {r.FirewoodUnits,7:0} {r.AvgHealth,7:0.0}");
+                }
+                if (colony.AlivePopulation == 0) { Console.WriteLine($"  -- wiped out day {r.Day} --"); break; }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"Final stock: planks={colony.Storehouse.Count(ResourceType.Planks):0}, " +
+                              $"ingots={colony.Storehouse.Count(ResourceType.IronIngot):0}, tools={colony.Storehouse.Count(ResourceType.Tools):0}.");
+            return 0;
+        }
+
+        private static void PlaceComplete(Settlement colony, BuildingType type, int x, int y)
+        {
+            Building b = colony.PlaceBlueprint(type, x, y);
+            b.WorkDone = b.WorkRequired;
+            b.Complete = true;
         }
 
         // ---------------------------------------------------------------- logistics

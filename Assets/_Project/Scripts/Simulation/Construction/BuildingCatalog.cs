@@ -45,6 +45,24 @@ namespace FoundersLands.Simulation.Construction
                 { WorkRequired = 50f, WoodcutterBonus = 0.25f }
                 .Needs(ResourceType.Wood, 16f));
 
+            // Workshops and market (Module 6, GDD §12). Their value is the recipes they run
+            // (see RecipeCatalog) and the market's service bonus, not passive stats.
+            c.Add(new BuildingDef(BuildingType.Sawmill, "Sawmill")
+                { WorkRequired = 60f }
+                .Needs(ResourceType.Wood, 18f).Needs(ResourceType.Stone, 4f));
+
+            c.Add(new BuildingDef(BuildingType.Smelter, "Smelter")
+                { WorkRequired = 90f }
+                .Needs(ResourceType.Wood, 14f).Needs(ResourceType.Stone, 20f));
+
+            c.Add(new BuildingDef(BuildingType.Smithy, "Smithy")
+                { WorkRequired = 80f }
+                .Needs(ResourceType.Wood, 16f).Needs(ResourceType.Stone, 12f));
+
+            c.Add(new BuildingDef(BuildingType.Market, "Market")
+                { WorkRequired = 70f }
+                .Needs(ResourceType.Wood, 22f));
+
             return c;
         }
     }

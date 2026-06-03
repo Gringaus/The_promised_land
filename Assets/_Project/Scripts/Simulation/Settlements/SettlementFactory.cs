@@ -30,12 +30,12 @@ namespace FoundersLands.Simulation.Settlements
             FindSite(map, out int cx, out int cy);
 
             ScanSurroundings(map, cx, cy, config.GatherRadius,
-                out float berries, out float fish, out float meat, out float wood, out float stone, out float avgFertility);
+                out float berries, out float fish, out float meat, out float wood, out float stone, out float iron, out float avgFertility);
 
             // Optionally re-weight resource potential by real path distance (GDD §3, §12).
             if (config.UsePathWeightedPotential)
             {
-                ScanWeighted(map, cx, cy, config, out berries, out fish, out meat, out wood, out stone);
+                ScanWeighted(map, cx, cy, config, out berries, out fish, out meat, out wood, out stone, out iron);
             }
 
             var settlement = new Settlement(map, cx, cy, config, catalog, seasons)
@@ -47,6 +47,7 @@ namespace FoundersLands.Simulation.Settlements
                 FoodFactor = Factor(berries + fish + meat, config.FoodPotentialForFull, config.MinFoodFactor),
                 FirewoodFactor = Factor(wood, config.FirewoodPotentialForFull, config.MinFirewoodFactor),
                 StoneFactor = Factor(stone, config.StonePotentialForFull, config.MinStoneFactor),
+                IronFactor = Factor(iron, config.IronPotentialForFull, config.MinIronFactor),
                 Rng = DeterministicRng.Stream(seed, StreamSettlement)
             };
 
@@ -88,9 +89,9 @@ namespace FoundersLands.Simulation.Settlements
         }
 
         private static void ScanSurroundings(WorldMap map, int cx, int cy, float radius,
-            out float berries, out float fish, out float meat, out float wood, out float stone, out float avgFertility)
+            out float berries, out float fish, out float meat, out float wood, out float stone, out float iron, out float avgFertility)
         {
-            berries = fish = meat = wood = stone = 0f;
+            berries = fish = meat = wood = stone = iron = 0f;
             float fertSum = 0f;
             int land = 0;
             int r = (int)radius;
@@ -114,7 +115,7 @@ namespace FoundersLands.Simulation.Settlements
                         case ResourceNodeKind.Game: meat += t.ResourceAmount; break;
                         case ResourceNodeKind.Wood: wood += t.ResourceAmount; break;
                         case ResourceNodeKind.Stone: stone += t.ResourceAmount; break;
-                        case ResourceNodeKind.IronOre: stone += t.ResourceAmount * 0.5f; break;
+                        case ResourceNodeKind.IronOre: stone += t.ResourceAmount * 0.5f; iron += t.ResourceAmount; break;
                     }
                 }
             }
@@ -126,9 +127,9 @@ namespace FoundersLands.Simulation.Settlements
         // marsh-locked deposits count for less. Aquatic nodes (fish) are reached from the
         // nearest walkable shore tile, since open water is impassable.
         private static void ScanWeighted(WorldMap map, int cx, int cy, SettlementConfig config,
-            out float berries, out float fish, out float meat, out float wood, out float stone)
+            out float berries, out float fish, out float meat, out float wood, out float stone, out float iron)
         {
-            berries = fish = meat = wood = stone = 0f;
+            berries = fish = meat = wood = stone = iron = 0f;
 
             var cost = new MovementCost(map);
             float[] dist = DistanceField.Compute(cost, map.Width, map.Height, new Coord(cx, cy));
@@ -152,7 +153,7 @@ namespace FoundersLands.Simulation.Settlements
                         case ResourceNodeKind.Game: meat += amt; break;
                         case ResourceNodeKind.Wood: wood += amt; break;
                         case ResourceNodeKind.Stone: stone += amt; break;
-                        case ResourceNodeKind.IronOre: stone += amt * 0.5f; break;
+                        case ResourceNodeKind.IronOre: stone += amt * 0.5f; iron += amt; break;
                     }
                 }
             }
@@ -203,6 +204,8 @@ namespace FoundersLands.Simulation.Settlements
             int loggers = (int)System.Math.Round(pop * config.LoggerShare);
             int quarrymen = (int)System.Math.Round(pop * config.QuarrymanShare);
             int builders = (int)System.Math.Round(pop * config.BuilderShare);
+            int miners = (int)System.Math.Round(pop * config.MinerShare);
+            int craftsmen = (int)System.Math.Round(pop * config.CraftsmanShare);
 
             // Cumulative thresholds; any remainder becomes idle.
             int tF = foragers;
@@ -210,6 +213,8 @@ namespace FoundersLands.Simulation.Settlements
             int tL = tW + loggers;
             int tQ = tL + quarrymen;
             int tB = tQ + builders;
+            int tM = tB + miners;
+            int tC = tM + craftsmen;
 
             for (int i = 0; i < pop; i++)
             {
@@ -218,6 +223,8 @@ namespace FoundersLands.Simulation.Settlements
                                 : i < tL ? Profession.Logger
                                 : i < tQ ? Profession.Quarryman
                                 : i < tB ? Profession.Builder
+                                : i < tM ? Profession.Miner
+                                : i < tC ? Profession.Craftsman
                                 : Profession.Idle;
 
                 string name = Names[s.Rng.NextInt(0, Names.Length)];

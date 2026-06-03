@@ -16,6 +16,8 @@ namespace FoundersLands.Simulation.Settlements
         public float LoggerShare = 0.0f;
         public float QuarrymanShare = 0.0f;
         public float BuilderShare = 0.0f;
+        public float MinerShare = 0.0f;
+        public float CraftsmanShare = 0.0f;
 
         public float StorehouseCapacity = 6000f;
 
@@ -36,15 +38,25 @@ namespace FoundersLands.Simulation.Settlements
         public float LoggerWoodPerDay = 4.0f;     // строевая древесина
         public float QuarrymanStonePerDay = 3.0f; // камень
         public float BuilderWorkPerDay = 8.0f;    // единиц работы на стройке (GDD §10)
+        public float MinerIronPerDay = 3.0f;      // железная руда
+        public float CraftsmanWorkPerDay = 8.0f;  // единиц работы в мастерских (GDD §12)
 
         // How map richness near the settlement gates output.
         public float GatherRadius = 24f;
         public float FoodPotentialForFull = 250f;
         public float FirewoodPotentialForFull = 250f;
         public float StonePotentialForFull = 250f;
+        public float IronPotentialForFull = 120f;
         public float MinFoodFactor = 0.2f;     // wild foraging even with no nodes
         public float MinFirewoodFactor = 0.1f;
         public float MinStoneFactor = 0.05f;
+        public float MinIronFactor = 0.0f;     // no iron without a deposit nearby
+
+        // Tools (GDD §12 "инструменты ускоряют работы") and market service. With none of
+        // these present the work multiplier is 1, so earlier modules are unaffected.
+        public float ToolsBonusMax = 0.5f;             // fully tooled -> +50% output
+        public float ToolsWearPerWorkerPerDay = 0.02f;
+        public float MarketProductivityBonus = 0.1f;   // a stocked market frees chore time
 
         // Opt-in: weight resource potential by real path distance from the site (Dijkstra)
         // instead of a flat radius, so rivers, marsh and distance shape the economy

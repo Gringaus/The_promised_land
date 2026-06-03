@@ -2,6 +2,7 @@ using FoundersLands.Simulation.Construction;
 using FoundersLands.Simulation.Economy;
 using FoundersLands.Simulation.Mathematics;
 using FoundersLands.Simulation.Population;
+using FoundersLands.Simulation.Production;
 using FoundersLands.Simulation.Time;
 
 namespace FoundersLands.Simulation.Settlements
@@ -19,8 +20,12 @@ namespace FoundersLands.Simulation.Settlements
             SeasonDef season = s.Seasons[(int)s.Clock.Season];
 
             s.RecomputeBuildingEffects();
-            Gather(s, season);
-            Construct(s, season);
+            float efficiency = ComputeWorkEfficiency(s);
+
+            Gather(s, season, efficiency);
+            Produce(s, season, efficiency);
+            Construct(s, season, efficiency);
+            WearTools(s);
             s.Storehouse.ApplySpoilage(s.Catalog);
             int deaths = ConsumeAndAge(s, season);
 
@@ -43,7 +48,7 @@ namespace FoundersLands.Simulation.Settlements
             return last;
         }
 
-        private static void Gather(Settlement s, SeasonDef season)
+        private static void Gather(Settlement s, SeasonDef season, float efficiency)
         {
             SettlementConfig c = s.Config;
             float foodQualityMult = s.ForageQuality.Multiplier();
@@ -58,7 +63,7 @@ namespace FoundersLands.Simulation.Settlements
                 {
                     case Profession.Forager:
                     {
-                        float nutrition = c.ForagerNutritionPerDay * (1f + s.ForagerBonus) * season.FoodGatherMult * season.WorkSpeedMult * s.FoodFactor;
+                        float nutrition = c.ForagerNutritionPerDay * (1f + s.ForagerBonus) * season.FoodGatherMult * season.WorkSpeedMult * s.FoodFactor * efficiency;
                         if (nutrition > 0f && foodDef.Nutrition > 0f)
                         {
                             float units = nutrition / (foodDef.Nutrition * foodQualityMult);
@@ -68,43 +73,107 @@ namespace FoundersLands.Simulation.Settlements
                     }
                     case Profession.Woodcutter:
                     {
-                        float firewood = c.WoodcutterFirewoodPerDay * (1f + s.WoodcutterBonus) * season.FirewoodGatherMult * season.WorkSpeedMult * s.FirewoodFactor;
+                        float firewood = c.WoodcutterFirewoodPerDay * (1f + s.WoodcutterBonus) * season.FirewoodGatherMult * season.WorkSpeedMult * s.FirewoodFactor * efficiency;
                         if (firewood > 0f) s.Storehouse.Add(ResourceType.Firewood, ResourceQuality.Standard, firewood);
                         break;
                     }
                     case Profession.Logger:
                     {
                         // Timber comes from forest, like firewood, so it shares the forest factor.
-                        float wood = c.LoggerWoodPerDay * season.FirewoodGatherMult * season.WorkSpeedMult * s.FirewoodFactor;
+                        float wood = c.LoggerWoodPerDay * season.FirewoodGatherMult * season.WorkSpeedMult * s.FirewoodFactor * efficiency;
                         if (wood > 0f) s.Storehouse.Add(ResourceType.Wood, ResourceQuality.Standard, wood);
                         break;
                     }
                     case Profession.Quarryman:
                     {
-                        float stone = c.QuarrymanStonePerDay * season.WorkSpeedMult * s.StoneFactor;
+                        float stone = c.QuarrymanStonePerDay * season.WorkSpeedMult * s.StoneFactor * efficiency;
                         if (stone > 0f) s.Storehouse.Add(ResourceType.Stone, ResourceQuality.Standard, stone);
+                        break;
+                    }
+                    case Profession.Miner:
+                    {
+                        float ironOre = c.MinerIronPerDay * season.WorkSpeedMult * s.IronFactor * efficiency;
+                        if (ironOre > 0f) s.Storehouse.Add(ResourceType.IronOre, ResourceQuality.Standard, ironOre);
                         break;
                     }
                 }
             }
         }
 
-        private static void Construct(Settlement s, SeasonDef season)
+        private static void Produce(Settlement s, SeasonDef season, float efficiency)
+        {
+            int craftsmen = CountProfession(s, Profession.Craftsman);
+            if (craftsmen == 0) return;
+            float labor = craftsmen * s.Config.CraftsmanWorkPerDay * season.WorkSpeedMult * efficiency;
+            ProductionSystem.Step(s.Buildings, s.Storehouse, s.Recipes, labor);
+        }
+
+        private static void Construct(Settlement s, SeasonDef season, float efficiency)
         {
             if (s.Buildings.Count == 0) return;
 
-            int builders = 0;
-            for (int i = 0; i < s.Citizens.Count; i++)
-            {
-                Citizen cz = s.Citizens[i];
-                if (cz.Alive && cz.Profession == Profession.Builder) builders++;
-            }
+            int builders = CountProfession(s, Profession.Builder);
 
             // Construction slows in winter and speeds in summer (GDD §9). No builders, no work.
-            float work = builders * s.Config.BuilderWorkPerDay * season.WorkSpeedMult;
+            float work = builders * s.Config.BuilderWorkPerDay * season.WorkSpeedMult * efficiency;
             if (work <= 0f) return;
 
             ConstructionSystem.Step(s.Buildings, s.Storehouse, work);
+        }
+
+        // Tools and a stocked market raise output (GDD §12). With neither present this is 1,
+        // so the earlier modules' balance is untouched.
+        private static float ComputeWorkEfficiency(Settlement s)
+        {
+            SettlementConfig c = s.Config;
+            int pop = s.AlivePopulation;
+
+            float toolsBonus = 0f;
+            if (pop > 0 && c.ToolsBonusMax > 0f)
+            {
+                float frac = s.Storehouse.Count(ResourceType.Tools) / pop;
+                if (frac > 1f) frac = 1f;
+                toolsBonus = frac * c.ToolsBonusMax;
+            }
+
+            float marketBonus = (c.MarketProductivityBonus > 0f && HasCompleteMarket(s) && s.FoodUnits() > 0f)
+                ? c.MarketProductivityBonus : 0f;
+
+            return 1f + toolsBonus + marketBonus;
+        }
+
+        private static void WearTools(Settlement s)
+        {
+            SettlementConfig c = s.Config;
+            if (c.ToolsWearPerWorkerPerDay <= 0f || s.Storehouse.Count(ResourceType.Tools) <= 0f) return;
+
+            int workers = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+            {
+                Citizen cz = s.Citizens[i];
+                if (cz.Alive && cz.Profession != Profession.Idle) workers++;
+            }
+            float wear = workers * c.ToolsWearPerWorkerPerDay;
+            if (wear > 0f) s.Storehouse.Remove(ResourceType.Tools, ResourceQuality.Standard, wear);
+        }
+
+        private static bool HasCompleteMarket(Settlement s)
+        {
+            for (int i = 0; i < s.Buildings.Count; i++)
+            {
+                if (s.Buildings[i].Complete && s.Buildings[i].Type == BuildingType.Market) return true;
+            }
+            return false;
+        }
+
+        private static int CountProfession(Settlement s, Profession p)
+        {
+            int n = 0;
+            for (int i = 0; i < s.Citizens.Count; i++)
+            {
+                if (s.Citizens[i].Alive && s.Citizens[i].Profession == p) n++;
+            }
+            return n;
         }
 
         private static int ConsumeAndAge(Settlement s, SeasonDef season)

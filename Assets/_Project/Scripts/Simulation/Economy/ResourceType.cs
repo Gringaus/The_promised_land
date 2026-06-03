@@ -15,6 +15,9 @@ namespace FoundersLands.Simulation.Economy
         Meat = 5,      // мясо (еда)
         Herbs = 6,     // травы
         Clay = 7,
-        IronOre = 8
+        IronOre = 8,
+        Planks = 9,     // доски (дерево -> доски)
+        IronIngot = 10, // слиток (руда -> слиток)
+        Tools = 11      // инструменты (слиток -> инструменты; ускоряют работу)
     }
 }

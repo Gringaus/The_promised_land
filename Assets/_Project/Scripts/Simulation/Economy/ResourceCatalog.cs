@@ -37,6 +37,11 @@ namespace FoundersLands.Simulation.Economy
             c.Add(new ResourceDef(ResourceType.IronOre, "Iron ore") { BuildingMaterial = true });
             c.Add(new ResourceDef(ResourceType.Herbs, "Herbs"));
 
+            // Manufactured goods (Module 6 production chains, GDD §12).
+            c.Add(new ResourceDef(ResourceType.Planks, "Planks") { BuildingMaterial = true });
+            c.Add(new ResourceDef(ResourceType.IronIngot, "Iron ingot"));
+            c.Add(new ResourceDef(ResourceType.Tools, "Tools"));
+
             // Food: nutrition per unit, with mild spoilage. Spoilage is gentle enough that
             // a winter stockpile is viable; food preservation/drying (GDD §8) is a later
             // refinement that will let some food keep far longer.
